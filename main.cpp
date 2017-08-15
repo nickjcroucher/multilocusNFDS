@@ -41,6 +41,11 @@ int main(int argc, char * argv[]) {
     p.selectedProp = 1.0;
     p.lowerSelection = 0;
     p.higherSelection = 1;
+    p.transformationProportion = 0;
+    p.transformationRate = 0;
+    p.transformationAsymmetryLoci = 1;
+    p.transformationAsymmetryMarker = 1;
+    p.genotypeSampleSize = 0;
     
     ////////////////////////
     // Parse command line //
@@ -53,13 +58,15 @@ int main(int argc, char * argv[]) {
     char* weightingFilename = NULL;
     char* orderingFilename = NULL;
     char* vtCogName = 0;
+    char* markerFilename = NULL;
+    int secondVaccinationGeneration = -100;
 
     if (argc == 1) {
         usage(argv[0]);
         return 1;
     } else {
         int opt = 0;
-        while ((opt = getopt(argc,argv,"hc:p:s:v:i:t:n:g:u:l:y:j:k:f:x:w:r:o:")) != EOF) {
+        while ((opt = getopt(argc,argv,"hc:p:s:v:i:t:n:g:u:l:y:j:k:f:x:w:r:o:m:z:e:a:b:d:q:")) != EOF) {
             switch (opt) {
                 case 'h':
                     usage(argv[0]);
@@ -90,11 +97,15 @@ int main(int argc, char * argv[]) {
                     break;
                 case 'u':
                     p.upperLimit = atof(optarg);
-                    p.upperLimit = p.upperLimit + 0.000001;
+                    if (p.upperLimit < 0.99999) {
+                        p.upperLimit = p.upperLimit + 0.000001;
+                    }
                     break;
                 case 'l':
                     p.lowerLimit = atof(optarg);
-                    p.lowerLimit = p.lowerLimit - 0.0000001;
+                    if (p.lowerLimit > 0.0000001) {
+                        p.lowerLimit = p.lowerLimit - 0.0000001;
+                    }
                     break;
                 case 'y':
                     p.selectedProp = atof(optarg);
@@ -104,6 +115,18 @@ int main(int argc, char * argv[]) {
                     break;
                 case 'k':
                     p.higherSelection = atof(optarg);
+                    break;
+                case 'z':
+                    p.transformationProportion = atof(optarg);
+                    break;
+                case 'e':
+                    p.transformationRate = atof(optarg);
+                    break;
+                case 'a':
+                    p.transformationAsymmetryLoci = atof(optarg);
+                    break;
+                case 'b':
+                    p.transformationAsymmetryMarker = atof(optarg);
                     break;
                 case 'f':
                     inputFilename = optarg;
@@ -119,6 +142,15 @@ int main(int argc, char * argv[]) {
                     break;
                 case 'o':
                     outputFilename = optarg;
+                    break;
+                case 'm':
+                    markerFilename = optarg;
+                    break;
+                case 'd':
+                    p.genotypeSampleSize = atoi(optarg);
+                    break;
+                case 'q':
+                    secondVaccinationGeneration = atoi(optarg);
                     break;
             }
         }
@@ -151,7 +183,19 @@ int main(int argc, char * argv[]) {
         return 1;
     }
     int genLimit = p.numGen+minGen;
-    int maxScNum = 1+(*std::max_element(std::begin(scList),std::end(scList)));
+//    int maxScNum = 1+(*std::max_element(std::begin(scList),std::end(scList)));
+    int maxScNum = 1+(*std::max_element(scList.begin(),scList.end()));
+    
+    // add marker information if a marker file is provided
+    std::vector<std::string> markerList;
+    if (markerFilename != NULL) {
+        int parseMarkersCheck = parseMarkerFile(population,markerFilename,&markerList);
+        if (parseMarkersCheck != 0) {
+            std::cerr << "Unable to parse marker file correctly" << std::endl;
+            usage(argv[0]);
+            return 1;
+        }
+    }
     
     //////////////////////
     // Pre-process data //
@@ -169,13 +213,17 @@ int main(int argc, char * argv[]) {
     }
     
     // parse actual statistics
-    if (p.programme == "s" && !(strcmp(frequencyFilename,"0"))) {
+//    if (p.programme == "s" && !(strcmp(frequencyFilename,"0"))) {
+    if (p.programme == "s" && frequencyFilename != NULL) {
         int parseCheck = parseFrequencyFile(frequencyFilename,accessoryLoci);
         if (parseCheck != 0) {
             std::cerr << "Unable to parse frequency file" << std::endl;
             usage(argv[0]);
             return 1;
         }
+    } else if (p.programme == "s") {
+        std::cerr << "Need to provide frequency file when running in pure simulation mode" << std::endl;
+        return 1;
     }
 
     // Differentially weight COGs by fixed input file or parameterisation
@@ -203,6 +251,18 @@ int main(int argc, char * argv[]) {
         eqFreq.push_back((*cit)->eqFreq);
         cogWeights.push_back((*cit)->weight);
     }
+
+    ////////////////////////////////////////
+    // Open sampling file for comparisons //
+    ////////////////////////////////////////
+    
+    std::string sampleOutFilename = std::string(outputFilename) + ".sample.out";
+    std::ofstream sampleOutFile;
+    if (p.programme != "s" && p.programme != "x") {
+        // sample output
+        sampleOutFile.open(sampleOutFilename,std::ios::out);
+        sampleOutFile << "Taxon" << "\t" << "Time" << "\t" << "Serotype" << "\t" << "VT" << "\t" << "SC" << std::endl;
+    }
     
     /////////////////////////////
     // Select first generation //
@@ -226,7 +286,7 @@ int main(int argc, char * argv[]) {
     std::vector<double> cogDeviations(eqFreq.size());
     
     // initialise population in first generation, record simulated population statistics
-    int gen = 0;
+    int gen = minGen;
     int initialiseCheck = getStartingIsolates(population,currentIsolates,accessoryLoci,p.popSize,eqFreq,cogWeights,cogDeviations, vtScFreq[0],nvtScFreq[0],scList);
     if (initialiseCheck != 0) {
         std::cerr << "Unable to initialise population" << std::endl;
@@ -234,14 +294,32 @@ int main(int argc, char * argv[]) {
         return 1;
     }
     
+    // check if second vaccine formulation is implemented from the start
+    if (secondVaccinationGeneration == gen) {
+        int vaccineChangeCheck = alterVaccineFormulation(currentIsolates,population,populationBySc);
+        if (vaccineChangeCheck != 0) {
+            std::cerr << "Unable to correcly alter vaccine status of the population" << std::endl;
+            return 1;
+        }
+    }
+    
     // get sample from first generation
     int numberComparisons = 0;
     
-    int summaryCheck = summariseGeneration(currentIsolates,samplingList[0],&scList,sampledVtScFreq,sampledNvtScFreq,&serotypeList,&sampledSeroFreq[gen]);
+    int summaryCheck = summariseGeneration(currentIsolates,samplingList[0],&scList,sampledVtScFreq,sampledNvtScFreq,&serotypeList,&sampledSeroFreq[gen-minGen]);
     if (summaryCheck != 0) {
         std::cerr << "Unable to summarise output of first generation" << std::endl;
         usage(argv[0]);
         return 1;
+    }
+    // for comparison for input file
+    if (p.programme != "s" && p.programme != "x") {
+        int firstSampleCheck = firstSample(currentIsolates,samplingList[0],sampleOutFile,minGen);
+        if (firstSampleCheck != 0) {
+            std::cerr << "Unable to take a random sample from first generation" << std::endl;
+            usage(argv[0]);
+            return 1;
+        }
     }
     
     // get initial COG deviations
@@ -250,12 +328,77 @@ int main(int argc, char * argv[]) {
     std::vector<double> nvtCogFittingStatsList;
     std::vector<double> strainFittingStatsList;
     
+    // print starting population for simulation
+    if (p.programme == "s") {
+        int printPopCheck = printPop(outputFilename,"startPop",currentIsolates,markerFilename,accessoryLoci,&markerList);
+        if (printPopCheck != 0) {
+            std::cerr << "Unable to print starting population" << std::endl;
+            usage(argv[0]);
+            return 1;
+        }
+    }
+    if (p.genotypeSampleSize > 0) {
+        int printPopSampleCheck = printPopSample(outputFilename,"startPopGenotypes.tab",currentIsolates,markerFilename,accessoryLoci,&markerList,p.genotypeSampleSize);
+        if (printPopSampleCheck != 0) {
+            std::cerr << "Unable to print starting population sample" << std::endl;
+            usage(argv[0]);
+            return 1;
+        }
+        
+    }
+    
+    // recombination in first generation
+//    if (p.transformationRate > 0) {
+//        
+//        // run recombination
+//        int transformationCheck = recombination(currentIsolates,futureIsolates,population,markerFilename,p.transformationRate,p.transformationAsymmetryLoci,p.transformationAsymmetryMarker);
+//        if (transformationCheck != 0) {
+//            std::cerr << "Isolate unable to undergo recombination" << std::endl;
+//            usage(argv[0]);
+//            return 1;
+//        }
+//        
+//        // move on to next generation
+//        int nextGenerationCheck = nextGeneration(currentIsolates,futureIsolates,population);
+//        if (nextGenerationCheck != 0) {
+//            std::cerr << "Cannot store first set of recombinant isolates" << std::endl;
+//            usage(argv[0]);
+//            return 1;
+//        }
+//        
+//    }
+    
     /////////////////////////////////
     // Iterate through generations //
     /////////////////////////////////
     
     // iterate through generations
     for (gen = minGen+1; gen <= genLimit; gen++) {
+        
+        // check if vaccine formulation changes
+        if (gen == secondVaccinationGeneration) {
+            int vaccineChangeCheck = alterVaccineFormulation(currentIsolates,population,populationBySc);
+            if (vaccineChangeCheck != 0) {
+                std::cerr << "Unable to correcly alter vaccine status of the population" << std::endl;
+                return 1;
+            }
+        }
+        
+        // recombination in subsequent generations
+        if (p.transformationProportion > 0 && p.transformationRate > 0) {
+            int transformationCheck = recombination(currentIsolates,futureIsolates,population,markerFilename,p.transformationProportion,p.transformationRate,p.transformationAsymmetryLoci,p.transformationAsymmetryMarker,&cogWeights,&cogDeviations,&eqFreq);
+            if (transformationCheck != 0) {
+                std::cerr << "Isolate unable to undergo recombination" << std::endl;
+                return 1;
+            }
+            // move on to next generation
+            int nextGenerationCheck = nextGeneration(currentIsolates,futureIsolates,population);
+            if (nextGenerationCheck != 0) {
+                std::cerr << "Cannot store first set of recombinant isolates" << std::endl;
+                usage(argv[0]);
+                return 1;
+            }
+        }
         
         // allow cells to reproduce and update COG deviations array
         int reproCheck = reproduction(currentIsolates,futureIsolates,population,populationBySc,&cogWeights,&cogDeviations,&p,&eqFreq,&vtScFreq[gen-minGen],&nvtScFreq[gen-minGen],&piGen[gen-minGen],&scList,gen);
@@ -264,20 +407,32 @@ int main(int argc, char * argv[]) {
             usage(argv[0]);
             return 1;
         }
+
         
         // move on to next generation
-        currentIsolates->clear();
-        currentIsolates->insert(currentIsolates->begin(),futureIsolates->begin(),futureIsolates->end());
-        futureIsolates->clear();
+        int nextGenerationCheck = nextGeneration(currentIsolates,futureIsolates,population);
+        if (nextGenerationCheck != 0) {
+            std::cerr << "Cannot store first set of recombinant isolates" << std::endl;
+            usage(argv[0]);
+            return 1;
+        }
         
+        // compare to genomes
         if ((gen-minGen) < samplingList.size() && samplingList[gen-minGen] > 0 && p.programme != "s" && p.programme != "x") {
-            int compareSamplesCheck = compareSamples(gen,minGen,samplingList[gen-minGen],currentIsolates,population,accessoryLoci,scList,sampledVtScFreq,sampledNvtScFreq,sampledSeroFreq[gen-minGen],serotypeList,vtCogFittingStatsList,nvtCogFittingStatsList,strainFittingStatsList);
+            int compareSamplesCheck = compareSamples(gen,minGen,samplingList[gen-minGen],currentIsolates,population,accessoryLoci,scList,sampledVtScFreq,sampledNvtScFreq,sampledSeroFreq[gen-minGen],serotypeList,vtCogFittingStatsList,nvtCogFittingStatsList,strainFittingStatsList,sampleOutFile);
             if (compareSamplesCheck != 0) {
                 std::cerr << "Unable to compare simulated and actual frequencies" << std::endl;
                 usage(argv[0]);
                 return 1;
             } else {
                 numberComparisons++;
+            }
+        } else if ((gen-minGen) < samplingList.size() && samplingList[gen-minGen] > 0 && p.programme == "s") {
+            int justRecordStatsCheck = justRecordStats(gen,minGen,samplingList[gen-minGen],currentIsolates,accessoryLoci);
+            if (justRecordStatsCheck != 0) {
+                std::cerr << "Unable to record simulation statistics" << std::endl;
+                usage(argv[0]);
+                return 1;
             }
         }
     }
@@ -331,6 +486,35 @@ int main(int argc, char * argv[]) {
         }
     }
     
+    // print finishing population for simulation
+    if (p.programme == "s") {
+        int printPopCheck = printPop(outputFilename,"finalPop",currentIsolates,markerFilename,accessoryLoci,&markerList);
+        if (printPopCheck != 0) {
+            std::cerr << "Unable to print starting population" << std::endl;
+            usage(argv[0]);
+            return 1;
+        }
+    }
+    if (p.genotypeSampleSize > 0) {
+        int printPopSampleCheck = printPopSample(outputFilename,"finalPopGenotypes.tab",currentIsolates,markerFilename,accessoryLoci,&markerList,p.genotypeSampleSize);
+        if (printPopSampleCheck != 0) {
+            std::cerr << "Unable to print final population sample" << std::endl;
+            usage(argv[0]);
+            return 1;
+        }
+        
+    }
+    
+    /////////////////////////////////////////
+    // Close sampling file for comparisons //
+    /////////////////////////////////////////
+    
+    if (p.programme != "s" && p.programme != "x") {
+        // sample output
+        sampleOutFile.close();
+    }
+    
+    // fin
     return 0;
 }
 

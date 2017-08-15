@@ -29,8 +29,13 @@ struct parms {
     double selectedProp;
     double lowerSelection;
     double higherSelection;
+    double transformationProportion;
+    double transformationRate;
+    double transformationAsymmetryLoci;
+    double transformationAsymmetryMarker;
     int popSize;
     int numGen;
+    int genotypeSampleSize;
 };
 
 // structure for isolate objects
@@ -39,21 +44,29 @@ struct isolate {
     int year;
     int sc;
     std::string serotype;
-    bool vt;
+    double vt;
+    double latent_vt;
     std::vector<bool> genotype;
+    std::vector<bool> markers;
     
     // constructor for struct 'isolate'
-    isolate(std::string init_id, int init_year, int init_sc, std::string init_serotype, bool init_vt, std::vector<bool> *init_genotype) {
+    isolate(std::string init_id, int init_year, int init_sc, std::string init_serotype, double init_vt, double second_vt, std::vector<bool> *init_genotype, std::vector<bool> *init_markers) {
         id = init_id;
         year = init_year;
         sc = init_sc;
         serotype = init_serotype;
         vt = init_vt;
+        latent_vt = second_vt;
         genotype = (*init_genotype);
+        markers = (*init_markers);
     };
     
     // copy constructor for struct 'isolate'
-    isolate(const isolate& other): id(other.id),year(other.year),sc(other.sc),serotype(other.serotype),vt(other.vt),genotype(other.genotype) {}
+    isolate(const isolate& other): id(other.id),year(other.year),sc(other.sc),serotype(other.serotype),vt(other.vt),latent_vt(other.latent_vt),genotype(other.genotype),markers(other.markers) {}
+    
+    // destructor for struct 'isolate'
+//    ~isolate ();
+
 };
 
 // structure for COG objects
@@ -67,7 +80,7 @@ struct cog {
     std::vector<double> simFreq;
     
     // constructor for struct 'cog'
-    cog(std::string init_id, bool init_vt, double init_weight, double init_eqFreq, std::vector<double> *init_actualFreq) {
+    cog(std::string init_id, int init_vt, double init_weight, double init_eqFreq, std::vector<double> *init_actualFreq) {
         id = init_id;
         vt = init_vt;
         weight = init_weight;
