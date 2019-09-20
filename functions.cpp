@@ -59,7 +59,7 @@ unsigned long int random_seed() {
 
 void usage (char* fn) {
     
-    std::cerr << "Programme:" << std::endl << "\tp\tprogramme type:" << std::endl << "\t\t's' - simulation without fitting" << std::endl << "\t\t'x' - extended simulation output" << std::endl << "\t\t'f' - just return fitting metrics" << std::endl << "\t\t'b' - both fit to data and print simulation" << std::endl << std::endl << "Simulation parameters:" << std::endl << "\ts\tfrequency dependent selection pressure [double between 0 and 1]" << std::endl << "\tv\tvaccine selection pressure  [double between 0 and 1]" << std::endl << "\ti\timmigration rate [double between 0 and 1]" << std::endl << "\tt\timmigration type [0 - by strain, 1 - by SC]" << std::endl << "\tn\tpopulation carrying capacity  [integer]" << std::endl << "\tg\tnumber of generations [integer]" << std::endl << "\tu\tupper gene frequency limit [double between 0 and 1]" << std::endl << "\tl\tlower gene frequency limit [double between 0 and 1]" << std::endl << "\tq\tgeneration in which vaccine formulation is changed" << std::endl << std::endl << "Model fitting parameters:" << std::endl << "\tc\tvaccine target COG name [string]" << std::endl << "\tb\tbeginning year [integer]" << std::endl << "\tm\tmid year [integer]" << std::endl << "\te\tending year [integer]" << std::endl << std::endl << "Filenames:" << std::endl << "\tf\tinputFilename" << std::endl << "\tx\tfrequency file name [only for simulating]" << std::endl << "\to\toutput file prefix" << std::endl << "\tw\tweighting file" << std::endl  << "\tr\tcog reordering file" << std::endl;
+    std::cerr << "Programme:" << fn << std::endl << "\tp\tprogramme type:" << std::endl << "\t\t's' - simulation without fitting" << std::endl << "\t\t'x' - extended simulation output" << std::endl << "\t\t'f' - just return fitting metrics" << std::endl << "\t\t'b' - both fit to data and print simulation" << std::endl << std::endl << "Simulation parameters:" << std::endl << "\ts\tfrequency dependent selection pressure [double between 0 and 1]" << std::endl << "\tv\tvaccine selection pressure  [double between 0 and 1]" << std::endl << "\ti\timmigration rate [double between 0 and 1]" << std::endl << "\tt\timmigration type [0 - by strain, 1 - by SC]" << std::endl << "\tn\tpopulation carrying capacity  [integer]" << std::endl << "\tg\tnumber of generations [integer]" << std::endl << "\tu\tupper gene frequency limit [double between 0 and 1]" << std::endl << "\tl\tlower gene frequency limit [double between 0 and 1]" << std::endl << "\tq\tgeneration in which vaccine formulation is changed" << std::endl << std::endl << "Model fitting parameters:" << std::endl << "\tc\tvaccine target COG name [string]" << std::endl << "\tb\tbeginning year [integer]" << std::endl << "\tm\tmid year [integer]" << std::endl << "\te\tending year [integer]" << std::endl << std::endl << "Filenames:" << std::endl << "\tf\tinputFilename" << std::endl << "\tx\tfrequency file name [only for simulating]" << std::endl << "\to\toutput file prefix" << std::endl << "\tw\tweighting file" << std::endl  << "\tr\tcog reordering file" << std::endl;
     
 }
 
@@ -71,7 +71,7 @@ void usage (char* fn) {
 // parse input file //
 //////////////////////
 
-int parseInputFile(std::vector<isolate*> *pop, std::vector<cog*> *accessoryLoci, double lower, double upper,  std::vector<int> &samplingList,std::vector<std::string> *st, std::vector<int> *sc, std::vector<std::string> *cogList, char *inputFilename, char * vtCogName, int &minGen) {
+int parseInputFile(std::vector<isolate*> *pop, std::vector<cog*> *accessoryLoci, double lower, double upper,  std::vector<int> *samplingList,std::vector<std::string> *st, std::vector<int> *sc, std::vector<std::string> *cogList, char *inputFilename, char * vtCogName, int &minGen) {
     
     // indices
     int s = 0;
@@ -94,8 +94,8 @@ int parseInputFile(std::vector<isolate*> *pop, std::vector<cog*> *accessoryLoci,
             int sample_time = -1;
             int sample_sc = -1;
             std::string sample_serotype = "noSero";
-            double sample_vt;
-            double sample_latent_vt;
+            bool sample_vt = 0;
+            bool sample_latent_vt = 0;
             std::vector<bool> sample_genotype;
             std::string iname;
             std::istringstream iss(line);
@@ -114,16 +114,16 @@ int parseInputFile(std::vector<isolate*> *pop, std::vector<cog*> *accessoryLoci,
                     } else if (sIndex == 2) {
                         sample_serotype = temp;
                     } else if (sIndex == 3) {
-                        double vt_double = atof(temp.c_str());
-                        if (vt_double == 0) {
-                            sample_vt = 0.0;
-                            sample_latent_vt = 0.0;
-                        } else if (vt_double <= 1) {
-                            sample_vt = vt_double;
-                            sample_latent_vt = 0.0;
-                        } else if (vt_double > 1) {
-                            sample_vt = 0.0;
-                            sample_latent_vt = vt_double - 1.0;
+                        int vt_int = atoi(temp.c_str());
+                        if (vt_int == 0) {
+                            sample_vt = false;
+                            sample_latent_vt = false;
+                        } else  if (vt_int == 1) {
+                            sample_vt = true;
+                            sample_latent_vt = false;
+                        } else if (vt_int == 2) {
+                            sample_vt = false;
+                            sample_latent_vt = true;
                         } else {
                             std::cerr << "Unknown VT status for " << sample_id << std::endl;
                         }
@@ -176,34 +176,37 @@ int parseInputFile(std::vector<isolate*> *pop, std::vector<cog*> *accessoryLoci,
                 maxTime = (*iter);
             }
         }
-
-        for (iter = samplingTimes.begin(), samplingTimes.end() ; iter != samplingTimes.end(); ++iter) {
-            samplingList[(*iter)-minGen]++;
-        }
         
+        samplingList->resize(maxTime+1,0);
+        for (iter = samplingTimes.begin(), samplingTimes.end() ; iter != samplingTimes.end(); ++iter) {
+//            std::cerr << "Iter: " << (*iter) << " ref: " << (*iter)-minGen << " altering: " << (*samplingList) << std::endl;
+            (*samplingList)[(*iter)-minGen] = 1;
+        }
+
         // create vector of accessory locus COG objects
         std::vector<int> includeLocus(tmpCogList.size(),0);
         std::vector<isolate*>::iterator iiter;
         std::vector<std::string> intCogList;
-        for (int i = 0; i < tmpCogList.size(); i++) {
+        for (unsigned int i = 0; i < tmpCogList.size(); i++) {
             // data structures for recording frequencies
             int overallFreq = 0;
-            std::vector<double> cogFrequencies(samplingList.size(),0);
+//            std::vector<double> cogFrequencies(samplingList.size(),0);
+            std::vector<double> cogFrequencies(samplingTimes.size(),0);
             double eqFreq = 0;
             // calculate gene frequencies from isolates
             for (iiter = pop->begin(), pop->end() ; iiter != pop->end(); ++iiter) {
                 overallFreq+=(*iiter)->genotype[i];
-                cogFrequencies[((*iiter)->year)-minGen]+=(double((*iiter)->genotype[i])/double(samplingList[((*iiter)->year)-minGen]));
+                cogFrequencies[((*iiter)->year)-minGen]+=(double((*iiter)->genotype[i])/double((*samplingList)[((*iiter)->year)-minGen]));
                 if ((*iiter)->year <= 0) {
                     eqFreq+=(double((*iiter)->genotype[i])/double(eqPop));
                 }
             }
             // retain if present at intermediate frequency OR vt-defining COG
 //            if ((double(overallFreq)/double(pop->size()) >= lower && double(overallFreq)/double(pop->size()) <= upper) || i == v) {
-            if ((eqFreq >= (lower-1e-07) && eqFreq <= (upper+1e-07)) || i == v) {
+            if ((eqFreq >= (lower-1e-07) && eqFreq <= (upper+1e-07)) || i == unsigned(v)) {
                 includeLocus[i] = 1;
                 int vtType = 0;
-                if (i == v) {
+                if (i == unsigned(v)) {
                     vtType = 1;
                 }
                 intCogList.push_back(tmpCogList[i]);
@@ -223,7 +226,7 @@ int parseInputFile(std::vector<isolate*> *pop, std::vector<cog*> *accessoryLoci,
         // recalculate isolate genotypes to only include COGs at intermediate frequency
         for (iiter = pop->begin(), pop->end() ; iiter != pop->end(); ++iiter) {
             std::vector<bool> tmpGenotype;
-            for (int i = 0; i < includeLocus.size(); i++) {
+            for (unsigned int i = 0; i < includeLocus.size(); i++) {
                 if (includeLocus[i] == 1) {
                     tmpGenotype.push_back((*iiter)->genotype[i]);
                 }
@@ -298,7 +301,7 @@ int parseMarkerFile(std::vector<isolate*> *pop,char *markerFilename,std::vector<
         // check all marker lengths are the same
         std::vector<isolate*>::iterator iiter;
         for (iiter = pop->begin(), pop->end() ; iiter != pop->end(); ++iiter) {
-            if (markerLength != (*iiter)->markers.size()) {
+            if (unsigned(markerLength) != (*iiter)->markers.size()) {
                 std::cerr << "Isolate " << (*iiter)->id << " has incorrect marker information; expecting " << markerLength << " but found " << (*iiter)->markers.size() << std::endl;
                 return 1;
             }
@@ -378,8 +381,8 @@ bool checkInputValues(struct parms *sp,char * inputFilename,char * vtCogName, ch
         std::cerr << "Warning! Need to set transformation proportion (z) and transformation rate (e) both greater than zero for recombination to occur" << std::endl;
         tmpvalid = 0;
     } else if (sp->transformationProportion+sp->transformationRate > 0) {
-        if (!(sp->transformationAsymmetryLoci >= 0 && sp->transformationAsymmetryLoci <= 1)) {
-            std::cerr << "Transformation asymmetry needs to be between 0 and 1" << std::endl;
+        if (sp->transformationAsymmetryLoci < 0) {
+            std::cerr << "Transformation asymmetry needs to be be greater than 0" << std::endl;
             tmpvalid = 0;
         }
         if (!(sp->transformationAsymmetryMarker >= 0 && sp->transformationAsymmetryMarker <= 1)) {
@@ -543,9 +546,9 @@ int parseOrderingFile(char* orderingFilename,std::vector<cog*> *accessoryLoci,st
     // check no loci have been duplicated, or lost, during reordering
     if (accessoryLoci->size() != orderedAccessoryLoci.size()) {
         std::cerr << "Duplicate or missing COGs found in COG reordering file: expecting " << accessoryLoci->size() << ", found " << orderedAccessoryLoci.size() << "; beneath the lists are compared:" << std::endl;
-        for (int j = 0; j < orderedAccessoryLoci.size(); j++) {
+        for (unsigned int j = 0; j < orderedAccessoryLoci.size(); j++) {
             std::cerr << orderedAccessoryLoci[j] << "\t";
-            for (int i = 0; i < accessoryLoci->size(); i++) {
+            for (unsigned int i = 0; i < accessoryLoci->size(); i++) {
                 if ((*accessoryLoci)[i]->id == orderedAccessoryLoci[j]) {
                     std::cerr << (*accessoryLoci)[i]->id;
                 }
@@ -553,9 +556,9 @@ int parseOrderingFile(char* orderingFilename,std::vector<cog*> *accessoryLoci,st
             std::cerr << std::endl;
         }
         std::cerr << "Alternative ordering:" << std::endl;
-        for (int i = 0; i < accessoryLoci->size(); i++) {
+        for (unsigned int i = 0; i < accessoryLoci->size(); i++) {
             std::cerr << (*accessoryLoci)[i]->id << "\t";
-            for (int j = 0; j < orderedAccessoryLoci.size(); j++) {
+            for (unsigned int j = 0; j < orderedAccessoryLoci.size(); j++) {
                 if ((*accessoryLoci)[i]->id == orderedAccessoryLoci[j]) {
                     std::cerr << orderedAccessoryLoci[j] << std::endl;
                 }
@@ -565,7 +568,7 @@ int parseOrderingFile(char* orderingFilename,std::vector<cog*> *accessoryLoci,st
     }
     
     // assign weights appropriately
-    for (int cindex = 0; cindex < orderedAccessoryLoci.size(); cindex++) {
+    for (unsigned int cindex = 0; cindex < orderedAccessoryLoci.size(); cindex++) {
         for (cit = accessoryLoci->begin(), accessoryLoci->end(); cit != accessoryLoci->end(); ++cit) {
             if ((*cit)->id.compare(orderedAccessoryLoci[cindex]) == 0) {
                 if ((float(cindex)/float(orderedAccessoryLoci.size())) <= (1.0-sp->selectedProp)) {
@@ -602,7 +605,7 @@ int dividePopulationForImmigration(std::vector<isolate*> *pop,std::vector <int> 
 //    std::vector<std::vector<isolate*> > tmpStrains(maxScNum);
     std::vector<std::vector<isolate*> > tmpStrains(scList->size());
     
-    for (int s = 0; s < scList->size(); s++) {
+    for (unsigned int s = 0; s < scList->size(); s++) {
         std::vector<isolate*>::iterator cit;
         for (cit = pop->begin(), pop->end(); cit != pop->end(); ++cit) {
             if ((*cit)->sc == (*scList)[s]) {
@@ -624,11 +627,11 @@ int dividePopulationForImmigration(std::vector<isolate*> *pop,std::vector <int> 
 int getStartingIsolates(std::vector<isolate*> *pop,std::vector<isolate*> *first,std::vector<cog*> *accessoryLoci,int psize,std::vector<double> &eqFreq,std::vector<double> &cogWeights,std::vector<double> &cogDeviations,std::vector<int> &startingVtScFrequencies,std::vector<int> &startingNvtScFrequencies,std::vector<int> &scList) {
     
     // get all isolates observed in the pre- or peri-vaccine samples
-    std::vector<isolate*> possibleFirst;
+    std::vector<isolate*> *possibleFirst = new std::vector<isolate*>;
     std::vector<isolate*>::iterator iter;
     for (iter = pop->begin(), pop->end() ; iter != pop->end(); ++iter) {
         if ((*iter)->year <= 0) {
-            possibleFirst.push_back(*iter);
+            possibleFirst->push_back(*iter);
         }
     }
     
@@ -636,35 +639,38 @@ int getStartingIsolates(std::vector<isolate*> *pop,std::vector<isolate*> *first,
     // record starting COG frequencies
     std::vector<int> observedVtSc;
     std::vector<int> observedNvtSc;
-    while (first->size() < psize) {
+    while (first->size() < unsigned(psize)) {
         //int selection = rand()%possibleFirst.size();
-        int selection = int(double(gsl_rng_uniform(rgen))*int(possibleFirst.size()));
-        first->push_back(possibleFirst[selection]);
+        int selection = int(double(gsl_rng_uniform(rgen))*int(possibleFirst->size()));
+        first->push_back((*possibleFirst)[selection]);
         // record sequence clusters
-        if (possibleFirst[selection]->vt > 0) {
-            observedVtSc.push_back(possibleFirst[selection]->sc);
+        if ((*possibleFirst)[selection]->vt) {
+            observedVtSc.push_back((*possibleFirst)[selection]->sc);
         } else {
-            observedNvtSc.push_back(possibleFirst[selection]->sc);
+            observedNvtSc.push_back((*possibleFirst)[selection]->sc);
         }
         // calculate gene frequencies
-        for (int i = 0; i < possibleFirst[selection]->genotype.size();i++) {
-            (*accessoryLoci)[i]->simFreq[0]+=(double(possibleFirst[selection]->genotype[i])/double(psize));
+        for (unsigned int i = 0; i < (*possibleFirst)[selection]->genotype.size();i++) {
+            (*accessoryLoci)[i]->simFreq[0]+=(double((*possibleFirst)[selection]->genotype[i])/double(psize));
         }
     }
     
     // record sequence cluster statistics
-    for (int i = 0; i < scList.size(); ++i) {
+    for (unsigned int i = 0; i < scList.size(); ++i) {
         startingVtScFrequencies[i] = std::count(observedVtSc.begin(),observedVtSc.end(),scList[i]);
         startingNvtScFrequencies[i] = std::count(observedNvtSc.begin(),observedNvtSc.end(),scList[i]);
     }
     
     // record gene frequency statistics
     std::vector<double> startingCogFrequencies(accessoryLoci->size(),0.0);
-    for (int i = 0; i < accessoryLoci->size(); i++) {
+    for (unsigned int i = 0; i < accessoryLoci->size(); i++) {
         startingCogFrequencies[i] = (*accessoryLoci)[i]->simFreq[0];
     }
     std::transform(eqFreq.begin(), eqFreq.end(), startingCogFrequencies.begin(), cogDeviations.begin(), std::minus<double>());
     std::transform(cogWeights.begin(), cogWeights.end(), cogDeviations.begin(), cogDeviations.begin(), std::multiplies<double>());
+    
+    // tidy
+    delete possibleFirst;
     
     return 0;
 }
@@ -676,23 +682,26 @@ int getStartingIsolates(std::vector<isolate*> *pop,std::vector<isolate*> *first,
 int firstSample(std::vector<isolate*> *currentIsolates,int firstSample,std::ofstream& sampleOutFile,int minGen) {
     
     // data structures for sample
-    std::vector<isolate*> isolateSample;
+    std::vector<isolate*> *isolateSample = new std::vector<isolate*>;
     
     // get appropriately sized random sample from simulation
-    while (isolateSample.size() < firstSample) {
+    while (isolateSample->size() < unsigned(firstSample)) {
 //        int selection = rand()%currentIsolates->size();
         int selection = int(double(gsl_rng_uniform(rgen))*currentIsolates->size());
         isolate *selectedIsolate = (*currentIsolates)[selection];
-        isolateSample.push_back(selectedIsolate);
+        isolateSample->push_back(selectedIsolate);
         // print record of sample to file
         int vtInt = 0;
-        if (selectedIsolate->latent_vt > 0) {
+        if (selectedIsolate->latent_vt) {
             vtInt = 2;
-        } else if (selectedIsolate->vt > 0) {
+        } else if (selectedIsolate->vt) {
             vtInt = 1;
         }
         sampleOutFile << selectedIsolate->id << "\t" << minGen << "\t" << selectedIsolate->serotype << "\t" << vtInt << "\t" << selectedIsolate->sc << std::endl;
     }
+    
+    // tidy
+    delete isolateSample;
     
     return 0;
     
@@ -724,13 +733,13 @@ int summariseGeneration(std::vector<isolate*> *pop,int sampleSize,std::vector<in
     }
     
     // now summarise serotypes in sample
-    for (int i = 0; i < seros->size(); i++) {
+    for (unsigned int i = 0; i < seros->size(); i++) {
         int tmpSeroNum = std::count(genSerotypes.begin(),genSerotypes.end(),(*seros)[i]);
         (*serotypeF)[i] = tmpSeroNum;
     }
     
     // summarise sequence clusters in sample
-    for (int i = 0; i < scs->size(); i++) {
+    for (unsigned int i = 0; i < scs->size(); i++) {
         sampledVtScFreq[0][i]+=(double(std::count(sampledVtSequenceClusters.begin(),sampledVtSequenceClusters.end(),(*scs)[i]))/double(sampleSize));
         sampledNvtScFreq[0][i]+=(double(std::count(sampledNvtSequenceClusters.begin(),sampledNvtSequenceClusters.end(),(*scs)[i]))/double(sampleSize));
     }
@@ -748,22 +757,22 @@ int alterVaccineFormulation(std::vector<isolate*> *currentIsolates,std::vector<i
     
     // change VT of current population
     for (iter = currentIsolates->begin(), currentIsolates->end(); iter != currentIsolates->end(); ++iter) {
-        if ((*iter)->vt == 0) {
+        if (!(*iter)->vt) {
             (*iter)->vt = (*iter)->latent_vt;
         }
     }
     
     // change VT of underlying population
     for (iter = pop->begin(), pop->end(); iter != pop->end(); ++iter) {
-        if ((*iter)->vt == 0) {
+        if (!(*iter)->vt) {
             (*iter)->vt = (*iter)->latent_vt;
         }
     }
     
     // change VT of potential immigrant isolates
-    for (int i = 0; i < popBySc->size(); i++) {
+    for (unsigned int i = 0; i < popBySc->size(); i++) {
         for (iter = (*popBySc)[i].begin(), (*popBySc)[i].end(); iter != (*popBySc)[i].end(); ++iter) {
-            if ((*iter)->vt == 0.0) {
+            if (!(*iter)->vt) {
                 (*iter)->vt = (*iter)->latent_vt;
             }
         }
@@ -813,22 +822,13 @@ int reproduction(std::vector<isolate*> *currentIsolates,std::vector<isolate*> *f
             double vaccineFit = 1.0;
             
             // only switch on vaccine selection pressure after vaccine is introduced
-            if (gen >= 0 && (*iter)->vt > 0) {
-                vaccineFit = 1.0 - (double(sp->vSelection)*(*iter)->vt);
+            if (gen >= 0 && (*iter)->vt) {
+                vaccineFit = 1.0 - double(sp->vSelection);
             }
             // calculate overall fitness
             double overallFitness = baseR*vaccineFit*freqDepFit;
             oldFitness = overallFitness;
             oldId = (*iter)->id;
-            
-            // debug
-//            if (gen == 200) {
-//                std::cerr << (*iter)->id << std::endl;
-//            }
-//                if ((*iter)->sc == 25) {
-//                    std::cerr << gen << "\t" << freqDepFit << std::endl;
-//                }
-            // debug
             
         }
         // select offspring by Poisson distribution
@@ -836,7 +836,7 @@ int reproduction(std::vector<isolate*> *currentIsolates,std::vector<isolate*> *f
         for (int p = 0; p < progeny; p++) {
             futureIsolates->push_back((*iter));
             // record statistics
-            if ((*iter)->vt > 0) {
+            if ((*iter)->vt) {
                 futureVtScs.push_back((*iter)->sc);
             } else {
                 futureNvtScs.push_back((*iter)->sc);
@@ -845,7 +845,7 @@ int reproduction(std::vector<isolate*> *currentIsolates,std::vector<isolate*> *f
         }
         // tally their COGs in new matrix
         if (progeny > 0) {
-            for (int c = 0; c < (*iter)->genotype.size(); c++) {
+            for (unsigned int c = 0; c < (*iter)->genotype.size(); c++) {
                 futureCogCount[c]+=(*iter)->genotype[c]*progeny;
             }
         }
@@ -855,34 +855,40 @@ int reproduction(std::vector<isolate*> *currentIsolates,std::vector<isolate*> *f
     double adjustedImmigrationRate = (sp->immigrationRate)*(double(sp->popSize)/double(currentIsolates->size()));
     int immigrants = gsl_ran_binomial(rgen,adjustedImmigrationRate,sp->popSize);
     
+    std::vector<isolate*> *candidates = new std::vector<isolate*>;
+    int selection = 0;
+    
     for (int f = 0; f < immigrants; f++) {
-        isolate* selectedIsolate;
+        
         if (sp->immigrationType == 0) {
-//            int selection = int(rand()%pop->size());
-            int selection = int(double(gsl_rng_uniform(rgen))*pop->size());
-            selectedIsolate = (*pop)[selection];
+            selection = int(double(gsl_rng_uniform(rgen))*pop->size());
+            candidates = pop;
+//            selectedIsolate = (*pop)[selection];
         } else if (sp->immigrationType == 1) {
-//            int selectedScIndex = int(rand()%scList->size());
-//            int selectedSc = (*scList)[selectedScIndex];
             int selectedScIndex = int(double(gsl_rng_uniform(rgen))*scList->size());
-            std::vector<isolate*> candidates = (*popBySc)[selectedScIndex];
-//            int selection = int(rand()%candidates.size());
-            int selection = int(double(gsl_rng_uniform(rgen))*candidates.size());
-            selectedIsolate = candidates[selection];
+            candidates = &(*popBySc)[selectedScIndex];
+            selection = int(double(gsl_rng_uniform(rgen))*candidates->size());
+//            selectedIsolate = (*candidates)[selection];
             
         } else {
             return 1;
         }
+        // select isolates
+        
+//        isolate migrant = &(*candidates)[selection];
+//        isolate* selectedIsolate = new isolate((*candidates)[selection]->id,(*candidates)[selection]->year,(*candidates)[selection]->sc,(*candidates)[selection]->serotype,(*candidates)[selection]->vt,(*candidates)[selection]->latent_vt,&(*candidates)[selection]->genotype,&(*candidates)[selection]->markers);
+        isolate* selectedIsolate = (*candidates)[selection];
+        
         futureIsolates->push_back(selectedIsolate);
         // record statistics
-        if (selectedIsolate->vt > 0) {
+        if (selectedIsolate->vt) {
             futureVtScs.push_back(selectedIsolate->sc);
         } else {
             futureNvtScs.push_back(selectedIsolate->sc);
         }
         futureSerotypes.push_back(selectedIsolate->serotype);
         // tally COGs in new matrix
-        for (int c = 0; c < selectedIsolate->genotype.size(); c++) {
+        for (unsigned int c = 0; c < selectedIsolate->genotype.size(); c++) {
             futureCogCount[c]+=selectedIsolate->genotype[c];
         }
     }
@@ -896,17 +902,19 @@ int reproduction(std::vector<isolate*> *currentIsolates,std::vector<isolate*> *f
     std::fill(cogDeviations->begin(),cogDeviations->end(),0);
     std::transform(ef->begin(), ef->end(), cogFractions.begin(), cogDeviations->begin(), std::minus<double>());
     // now summarise COG deviations before they are weighted in the extended output mode
-    std::transform(cogDeviations->begin(), cogDeviations->end(), piGen->begin(), piGen->begin(), std::plus<double>());
+    if (sp->programme == "x") {
+        std::transform(cogDeviations->begin(), cogDeviations->end(), piGen->begin(), piGen->begin(), std::plus<double>());
+    }
     // now weight the COG deviations
     std::transform(cogWeights->begin(), cogWeights->end(), cogDeviations->begin(), cogDeviations->begin(), std::multiplies<double>());
     
     // now summarise sequence clusters - vaccine types
-    for (int i = 0; i < scList->size(); i++) {
+    for (unsigned int i = 0; i < scList->size(); i++) {
         (*vtScFreq)[i] = std::count(futureVtScs.begin(),futureVtScs.end(),(*scList)[i]);
     }
     
     // now summarise sequence clusters - non-vaccine types
-    for (int i = 0; i < scList->size(); i++) {
+    for (unsigned int i = 0; i < scList->size(); i++) {
         (*nvtScFreq)[i] = std::count(futureNvtScs.begin(),futureNvtScs.end(),(*scList)[i]);
     }
     
@@ -919,29 +927,39 @@ int reproduction(std::vector<isolate*> *currentIsolates,std::vector<isolate*> *f
 
 bool alleleExchange (bool r, bool d, double a) {
     
+    // present in recipient
     if (r) {
+        // also present in donor
         if (d) {
             return true;
+        // absent in donor
         } else {
-            double p =  (double)rand() / RAND_MAX;
+            double p =  double(gsl_rng_uniform(rgen));
+            // if asymmetry favours deletion
             if (a <= 1) {
                 return false;
+            // if asymmetry favours insertion
             } else if (p <= double(1.0/a)) {
                 return false;
             } else {
                 return true;
             }
         }
+    // absent in recipient
     } else {
+        // present in donor
         if (d) {
-            double p =  (double)rand() / RAND_MAX;
+            double p =  double(gsl_rng_uniform(rgen));
+            // asymmetry favours insertions
             if (a >= 1) {
                 return true;
+            // asymmetry favours deletions
             } else if (p <= a) {
                 return true;
             } else {
                 return false;
             }
+        // also absent in donor
         } else {
             return false;
         }
@@ -973,23 +991,37 @@ const std::vector<std::string> explode(const std::string& s, const char& c) {
     return v;
 }
 
-int recombination(std::vector<isolate*> *currentIsolates,std::vector<isolate*> *futureIsolates,std::vector<isolate*> *pop,char* markerFilename,double transformationProportion,double transformationRate,double transformationAsymmetryLoci, double transformationAsymmetryMarker,std::vector<double> *cogWeights, std::vector<double> *cogDeviations, std::vector<double> *ef) {
+
+std::string generateRandomString(size_t length) {
+    const char* charmap = "ABCDEFGHIJKLMNOPQRSTUVWXYZ01234567";
+    const size_t charmapLength = strlen(charmap);
+    auto generator = [&](){ return charmap[rand()%charmapLength]; };
+    std::string result;
+    result.reserve(length);
+    generate_n(back_inserter(result), length, generator);
+    return result;
+}
+
+int recombination(std::vector<isolate*> *currentIsolates,std::vector<isolate*> *futureIsolates,char* markerFilename,double transformationProportion,double transformationRate,double transformationAsymmetryLoci, double transformationAsymmetryMarker) {
 
     // recombination
     std::vector<isolate*>::iterator iit;
-    for (iit = currentIsolates->begin(), currentIsolates->end() ; iit != currentIsolates->end(); ++iit) {
+    
+    std::vector<isolate*> *isolate_array = currentIsolates;
+    
+    for (iit = isolate_array->begin(), isolate_array->end() ; iit != isolate_array->end(); ++iit) {
         isolate recipient = *(*iit);
         bool recHappened = false;
         // test if recombination occurs in this isolate at this timestep
-        double rTrans = (double)rand() / RAND_MAX;
-        if (rTrans <= transformationProportion) {
+        double rTrans = double(gsl_rng_uniform(rgen));
+        if (rTrans <= transformationRate) {
             // if so, how much of the genome is replaced
-            for (int i = 0; i < recipient.genotype.size(); i++) {
+            for (unsigned int i = 0; i < recipient.genotype.size(); i++) {
                 // recombination at selected loci
-                double pTrans = (double)rand() / RAND_MAX;
-                if (pTrans <= transformationRate) {
-                    int j = int(rand() % pop->size());
-                    bool donorAllele = (*pop)[j]->genotype[i];
+                double pTrans = double(gsl_rng_uniform(rgen));
+                if (pTrans <= transformationProportion) {
+                    int j = int(gsl_rng_uniform(rgen) * isolate_array->size());
+                    bool donorAllele = (*isolate_array)[j]->genotype[i];
                     bool recipientAllele = recipient.genotype[i];
                     recipient.genotype[i] = alleleExchange(recipientAllele,donorAllele,transformationAsymmetryLoci);
                     if (recipient.genotype[i] != recipientAllele) {
@@ -1000,12 +1032,12 @@ int recombination(std::vector<isolate*> *currentIsolates,std::vector<isolate*> *
             }
             // recombination at unselected markers
             if (markerFilename != NULL) {
-                for (int i = 0; i < recipient.markers.size(); i++) {
-                    double mTrans = (double)rand() / RAND_MAX;
+                for (unsigned int i = 0; i < recipient.markers.size(); i++) {
+                    double mTrans = double(gsl_rng_uniform(rgen));
                     if (mTrans <= transformationRate) {
                         recHappened = true;
-                        int j = int(rand() % pop->size());
-                        bool donorAllele = (*pop)[j]->markers[i];
+                        int j = int(gsl_rng_uniform(rgen) * isolate_array->size());
+                        bool donorAllele = (*isolate_array)[j]->markers[i];
                         bool recipientAllele = recipient.markers[i];
                         recipient.markers[i] = alleleExchange(recipientAllele,donorAllele,transformationAsymmetryMarker);
                         if (recipient.markers[i] != recipientAllele) {
@@ -1021,10 +1053,7 @@ int recombination(std::vector<isolate*> *currentIsolates,std::vector<isolate*> *
                 seglist = explode(recipient.id,'_');
                 
                 // generate new hexadecimal suffix
-                char newSuffix[7];
-                for(int i = 0; i < 7; i++) {
-                    sprintf(newSuffix + i, "%x", rand() % 16);
-                }
+                std::string newSuffix = generateRandomString(7);
                 
                 // assign new ID
                 recipient.id = seglist[0]+"_"+newSuffix;
@@ -1032,8 +1061,7 @@ int recombination(std::vector<isolate*> *currentIsolates,std::vector<isolate*> *
                 // store in new population
                 
                 isolate* tmp = new isolate(recipient.id,recipient.year,recipient.sc,recipient.serotype,recipient.vt,recipient.latent_vt,&recipient.genotype,&recipient.markers);
-    //            pop->push_back(tmp);
-                futureIsolates->push_back(&(*tmp));
+                futureIsolates->push_back(tmp);
                 
             } else {
                 futureIsolates->push_back((*iit));
@@ -1044,10 +1072,23 @@ int recombination(std::vector<isolate*> *currentIsolates,std::vector<isolate*> *
 
     }
 
+    return 0;
+}
+
+///////////////////////////////////////////////////////
+// Update equilibrium frequencies post-recombination //
+///////////////////////////////////////////////////////
+
+int update_locus_freq(std::vector<isolate*> *futureIsolates, std::vector<double> *cogWeights, std::vector<double> *cogDeviations, std::vector<double> *ef) {
+
+//    std::cout << "Recombination count per generation: " << recombination_count << " num. loci transferred is: " << transferred_loci << " of attempted " << try_transfer << " representing - 11: " << one_one << " 10: " << one_zero << " 01: " << zero_one << " 00: " << zero_zero << std::endl; // debug
+    
+    std::vector<isolate*>::iterator iit;
+    
     // calculate COG deviations in next generation
     std::vector<double> cogFractions(ef->size(),0.0);
     for (iit = futureIsolates->begin(), futureIsolates->end(); iit != futureIsolates->end(); ++iit) {
-        for (int c = 0; c < (*iit)->genotype.size(); c++) {
+        for (unsigned int c = 0; c < (*iit)->genotype.size(); c++) {
             cogFractions[c]+=(double((*iit)->genotype[c])/double(futureIsolates->size()));
         }
     }
@@ -1057,11 +1098,6 @@ int recombination(std::vector<isolate*> *currentIsolates,std::vector<isolate*> *
     // now weight the COG deviations
     std::transform(cogWeights->begin(), cogWeights->end(), cogDeviations->begin(), cogDeviations->begin(), std::multiplies<double>());
     
-//    std::vector<isolate>::iterator isoi;
-//    for (isoi = recombinantGenotypes.begin(), recombinantGenotypes.end() ; isoi != recombinantGenotypes.end(); ++isoi) {
-//        futureIsolates->push_back(&(*isoi));
-//    }
-    
     return 0;
     
 }
@@ -1070,41 +1106,81 @@ int recombination(std::vector<isolate*> *currentIsolates,std::vector<isolate*> *
 // Move isolates into next generation //
 ////////////////////////////////////////
 
-int nextGeneration(std::vector<isolate*> *currentIsolates,std::vector<isolate*> *futureIsolates,std::vector<isolate*> *pop) {
+int updatePopulation(std::vector<isolate*> *pop,std::vector<isolate*> *new_pop) {
     
+    // swap populations
+    pop->clear();
+    pop->shrink_to_fit();
+    pop->swap(*new_pop);
+    
+    // finish
+    return 0;
+    
+}
+
+int nextGeneration(std::vector<isolate*> *pop,std::vector<isolate*> *new_pop,std::vector<isolate*> *currentIsolates,std::vector<isolate*> *futureIsolates) {
+    
+    // list of objects to delete
+    std::vector<isolate*> *to_delete = new std::vector<isolate*>;
+    
+    // iterate through currentIsolates to identify obsolete genotypes
     sort(currentIsolates->begin(), currentIsolates->end());
     std::vector<isolate*>::iterator iit;
     iit = unique(currentIsolates->begin(), currentIsolates->end());
     currentIsolates->resize(distance(currentIsolates->begin(),iit));
-
+    
     for (iit = currentIsolates->begin(), currentIsolates->end() ; iit != currentIsolates->end(); ++iit) {
         if (!(std::find(futureIsolates->begin(), futureIsolates->end(),(*iit))!=futureIsolates->end())) {
-            if (!(std::find(pop->begin(), pop->end(),(*iit))!=pop->end())) {
-                delete (*iit);
+            if (!(std::find(new_pop->begin(), new_pop->end(), (*iit))!=new_pop->end())) {
+                to_delete->push_back(*iit);
             }
         }
     }
+
+    // iterate through population to identify obsolete genotypes
+    sort(pop->begin(), pop->end());
+    iit = unique(pop->begin(), pop->end());
+    pop->resize(distance(pop->begin(),iit));
     
-//    std::vector <isolate*> isolateList = *currentIsolates;
-//    
-//    for (int i = 0; i < isolateList.size(); i++) {
-//        if (i == 0 || isolateList[i] != isolateList[i-1]) {
-//            if (!(std::find(futureIsolates->begin(), futureIsolates->end(),isolateList[i])!=futureIsolates->end())) {
-//                delete isolateList[i];
-//            }
-//        }
-//    }
+    for (iit = pop->begin(), pop->end() ; iit != pop->end(); ++iit) {
+        if (!(std::find(futureIsolates->begin(), futureIsolates->end(),(*iit))!=futureIsolates->end())) {
+            if (!(std::find(new_pop->begin(), new_pop->end(), (*iit))!=new_pop->end())) {
+                if (!(std::find(to_delete->begin(), to_delete->end(), (*iit))!=to_delete->end())) {
+                    to_delete->push_back(*iit);
+                }
+            }
+        }
+    }
+
+    // delete obsolete isolates
+    sort(to_delete->begin(), to_delete->end());
+    iit = unique(to_delete->begin(), to_delete->end());
+    pop->resize(distance(to_delete->begin(),iit));
+
+    int i = 0;
+    for (iit = to_delete->begin(), to_delete->end() ; iit != to_delete->end(); ++iit) {
+        delete (*iit);
+        ++i;
+    }
     
-//    std::vector<isolate*>::iterator iit;
-//    for (iit = currentIsolates->begin(), currentIsolates->end() ; iit != currentIsolates->end(); ++iit) {
-//        if (!(std::find(futureIsolates->begin(), futureIsolates->end(),(*iit))!=futureIsolates->end())) {
-//            delete (*iit);
-//        }
-//    }
-    
+    // replace current isolates with future isolates
     currentIsolates->clear();
-    currentIsolates->insert(currentIsolates->begin(),futureIsolates->begin(),futureIsolates->end());
+    currentIsolates->shrink_to_fit();
+    currentIsolates->swap(*futureIsolates);
     futureIsolates->clear();
+    futureIsolates->shrink_to_fit();
+    
+    // replace old population with new population
+    // if old population not in extanded population
+    // or new migrant pool, then dropped from simulation
+    pop->clear();
+    pop->shrink_to_fit();
+    pop->swap(*new_pop);
+    new_pop->clear();
+    new_pop->shrink_to_fit();
+    
+    // tidy up
+    delete to_delete;
     
     return 0;
     
@@ -1123,7 +1199,7 @@ int compareSamples(int gen,int minGen,int sampleSize,std::vector<isolate*> *curr
     std::vector<int> currentNvtScObservations;
     
     // get appropriately sized random sample from simulation
-    while (isolateSample.size() < sampleSize) {
+    while (isolateSample.size() < unsigned(sampleSize)) {
 //        int selection = rand()%currentIsolates->size();
         int selection = int(double(gsl_rng_uniform(rgen))*currentIsolates->size());
         isolate *selectedIsolate = (*currentIsolates)[selection];
@@ -1131,27 +1207,27 @@ int compareSamples(int gen,int minGen,int sampleSize,std::vector<isolate*> *curr
         // record serotype frequencies
         currentSerotypeObservations.push_back(selectedIsolate->serotype);
         // record sequence cluster frequencies
-        if (selectedIsolate->vt > 0) {
+        if (selectedIsolate->vt) {
             currentVtScObservations.push_back(selectedIsolate->sc);
         } else {
             currentNvtScObservations.push_back(selectedIsolate->sc);
         }
         // print record of sample to file
         int vtInt = 0;
-        if (selectedIsolate->latent_vt > 0) {
+        if (selectedIsolate->latent_vt) {
             vtInt = 2;
-        } else if (selectedIsolate->vt > 0) {
+        } else if (selectedIsolate->vt) {
             vtInt = 1;
         }
         sampleOutFile << selectedIsolate->id << "\t" << gen << "\t" << selectedIsolate->serotype << "\t" << vtInt << "\t" << selectedIsolate->sc << std::endl;
         // calculate gene frequencies
-        for (int i = 0; i < selectedIsolate->genotype.size();i++) {
+        for (unsigned int i = 0; i < selectedIsolate->genotype.size();i++) {
             (*accessoryLoci)[i]->simFreq[gen-minGen]+=(double(selectedIsolate->genotype[i])/double(sampleSize));
         }
     }
     
     // summarise serotype information
-    for (int i = 0; i < serotypeList.size(); i++) {
+    for (unsigned int i = 0; i < serotypeList.size(); i++) {
         sampledSeroFreq[i] = std::count(currentSerotypeObservations.begin(),currentSerotypeObservations.end(),serotypeList[i]);
     }
 
@@ -1161,9 +1237,9 @@ int compareSamples(int gen,int minGen,int sampleSize,std::vector<isolate*> *curr
     
     std::vector<isolate*>::iterator iiter;
     for (iiter = pop->begin(), pop->end() ; iiter != pop->end(); ++iiter) {
-        if ((*iiter)->year == gen && (*iiter)->vt > 0) {
+        if ((*iiter)->year == gen && (*iiter)->vt) {
             currentGenomicVtScObservations.push_back((*iiter)->sc);
-        } else if ((*iiter)->year == gen && (*iiter)->vt == 0.0) {
+        } else if ((*iiter)->year == gen && !((*iiter)->vt)) {
             currentGenomicNvtScObservations.push_back((*iiter)->sc);
         }
     }
@@ -1174,7 +1250,7 @@ int compareSamples(int gen,int minGen,int sampleSize,std::vector<isolate*> *curr
     std::vector<int> currentGenomicVtScCount(scList.size(),0);
     std::vector<int> currentGenomicNvtScCount(scList.size(),0);
     
-    for (int i = 0; i < scList.size(); ++i) {
+    for (unsigned int i = 0; i < scList.size(); ++i) {
         // observations from simulated data
         currentVtScCounts[i] = std::count(currentVtScObservations.begin(),currentVtScObservations.end(),scList[i]);
         currentNvtScCounts[i] = std::count(currentNvtScObservations.begin(),currentNvtScObservations.end(),scList[i]);
@@ -1189,7 +1265,7 @@ int compareSamples(int gen,int minGen,int sampleSize,std::vector<isolate*> *curr
     // calculate divergence between real and simulated samples
     double cumulativeScDifference = 0.0;
 //    double cumulativeJSD = 0.0;
-    for (int i = 0; i < scList.size(); i++) {
+    for (unsigned int i = 0; i < scList.size(); i++) {
 //        double dkl_vt = std::abs(((double(currentGenomicVtScCount[i])+0.5)/double(sampleSize))*log((double(currentGenomicVtScCount[i])+0.5)/(double(currentVtScCounts[i])+0.5)));
 //        double dkl_nvt = std::abs(((double(currentGenomicNvtScCount[i])+0.5)/double(sampleSize))*log((double(currentGenomicNvtScCount[i])+0.5)/(double(currentNvtScCounts[i])+0.5)));
         
@@ -1239,9 +1315,9 @@ int compareSamples(int gen,int minGen,int sampleSize,std::vector<isolate*> *curr
     
     // recalculated each time - allows flexibility for changing VT definition over time for multiple
     // vaccine introductions
-    for (int i = 0; i < accessoryLoci->size(); i++) {
+    for (unsigned int i = 0; i < accessoryLoci->size(); i++) {
         // separate by VT for fitting statistic calculation
-        if ((*accessoryLoci)[i]->vt > 0) {
+        if ((*accessoryLoci)[i]->vt) {
 //            currentSampleVtFreq.push_back(generationCogFrequencies[i]);
             startingSampleVtFreq.push_back((*accessoryLoci)[i]->simFreq[0]);
             currentSampleVtFreq.push_back((*accessoryLoci)[i]->simFreq[gen-minGen]);
@@ -1258,7 +1334,7 @@ int compareSamples(int gen,int minGen,int sampleSize,std::vector<isolate*> *curr
     
     // calculate vaccine type COGs - absolute, not squared, value
     double vtCogStat = 0;
-    for (int i = 0; i < currentSampleVtFreq.size(); i++) {
+    for (unsigned int i = 0; i < currentSampleVtFreq.size(); i++) {
         if (startingSampleVtFreq[i] > 0 && startingGenomicVtFreq[i] > 0) {
             vtCogStat+=std::abs((currentSampleVtFreq[i]/startingSampleVtFreq[i])-(currentGenomicVtFreq[i]/startingGenomicVtFreq[i]));
         }
@@ -1291,7 +1367,7 @@ int justRecordStats(int gen,int minGen,int sampleSize,std::vector<isolate*> *cur
     std::vector<int> currentNvtScObservations;
     
     // get appropriately sized random sample from simulation
-    while (isolateSample.size() < sampleSize) {
+    while (isolateSample.size() < unsigned (sampleSize)) {
 //        int selection = rand()%currentIsolates->size();
         int selection = int(double(gsl_rng_uniform(rgen))*currentIsolates->size());
         isolate *selectedIsolate = (*currentIsolates)[selection];
@@ -1299,13 +1375,13 @@ int justRecordStats(int gen,int minGen,int sampleSize,std::vector<isolate*> *cur
         // record serotype frequencies
         currentSerotypeObservations.push_back(selectedIsolate->serotype);
         // record sequence cluster frequencies
-        if (selectedIsolate->vt > 0) {
+        if (selectedIsolate->vt) {
             currentVtScObservations.push_back(selectedIsolate->sc);
         } else {
             currentNvtScObservations.push_back(selectedIsolate->sc);
         }
         // calculate gene frequencies
-        for (int i = 0; i < selectedIsolate->genotype.size();i++) {
+        for (unsigned int i = 0; i < selectedIsolate->genotype.size();i++) {
             (*accessoryLoci)[i]->simFreq[gen-minGen]+=(double(selectedIsolate->genotype[i])/double(sampleSize));
         }
     }
@@ -1355,27 +1431,27 @@ double pearson(std::vector<double> *x,std::vector<double> *y) {
 // calculate reproductive fitness comparisons //
 ////////////////////////////////////////////////
 
-int rFitMetricCalculation(int minGen,int maxScNum,int numGen,std::vector<int> &samplingList,std::vector<int> &scList,std::vector< std::vector<double> > &sampledVtScFreq,std::vector< std::vector<double> > &sampledNvtScFreq,std::vector<isolate*> *population,std::vector<double> &rFitVector) {
+int rFitMetricCalculation(int minGen,std::vector<int> *samplingList,std::vector<int> &scList,std::vector< std::vector<double> > &sampledVtScFreq,std::vector< std::vector<double> > &sampledNvtScFreq,std::vector<isolate*> *population,std::vector<double> &rFitVector) {
     
     // data structures
-    std::vector<double> actualFoldChanges(samplingList.size(),0.0);
-    std::vector<double> simulatedFoldChanges(samplingList.size(),0.0);
+    std::vector<double> actualFoldChanges(samplingList->size(),0.0);
+    std::vector<double> simulatedFoldChanges(samplingList->size(),0.0);
     
     // calculate actual statistics
-    std::vector< std::vector<double> > realVtScFreq(numGen+1,std::vector<double>(scList.size(),0.0));
+    std::vector< std::vector<double> > realVtScFreq(samplingList->size()+1,std::vector<double>(scList.size(),0.0));
 //    realVtScFreq[genIndex][scIndex]+=(1/double(samplingList[genIndex]));
-    std::vector< std::vector<double> > realNvtScFreq(numGen+1,std::vector<double>(scList.size(),0.0));
+    std::vector< std::vector<double> > realNvtScFreq(samplingList->size()+1,std::vector<double>(scList.size(),0.0));
 //    realNvtScFreq[genIndex][scIndex]+=(1/double(samplingList[genIndex]));
     
     // record VT and NVT observations
-    std::vector< std::vector<int> > genomicVtObservations(numGen+1);
-    std::vector< std::vector<int> > genomicNvtObservations(numGen+1);
+    std::vector< std::vector<int> > genomicVtObservations(samplingList->size()+1);
+    std::vector< std::vector<int> > genomicNvtObservations(samplingList->size()+1);
     
     std::vector<isolate*>::iterator iiter;
     for (iiter = population->begin(), population->end(); iiter != population->end(); ++iiter) {
         int genIndex = (*iiter)->year-minGen;
-        if (samplingList[genIndex] > 0) {
-            if ((*iiter)->vt > 0) {
+        if ((*samplingList)[genIndex] > 0) {
+            if ((*iiter)->vt) {
                 genomicVtObservations[genIndex].push_back((*iiter)->sc);
             } else {
                 genomicNvtObservations[genIndex].push_back((*iiter)->sc);
@@ -1387,11 +1463,11 @@ int rFitMetricCalculation(int minGen,int maxScNum,int numGen,std::vector<int> &s
     }
     
     // summarise SC information
-    for (int genIndex = 0; genIndex < samplingList.size(); genIndex++) {
-        if (samplingList[genIndex] > 0) {
-            for (int scIndex = 0; scIndex < scList.size(); scIndex++) {
-                realVtScFreq[genIndex][scIndex] = double(std::count(genomicVtObservations[genIndex].begin(),genomicVtObservations[genIndex].end(),scList[scIndex]))/double(samplingList[genIndex]);
-                realNvtScFreq[genIndex][scIndex] = double(std::count(genomicNvtObservations[genIndex].begin(),genomicNvtObservations[genIndex].end(),scList[scIndex]))/double(samplingList[genIndex]);
+    for (unsigned int genIndex = 0; genIndex < samplingList->size(); genIndex++) {
+        if ((*samplingList)[genIndex] > 0) {
+            for (unsigned int scIndex = 0; scIndex < scList.size(); scIndex++) {
+                realVtScFreq[genIndex][scIndex] = double(std::count(genomicVtObservations[genIndex].begin(),genomicVtObservations[genIndex].end(),scList[scIndex]))/double((*samplingList)[genIndex]);
+                realNvtScFreq[genIndex][scIndex] = double(std::count(genomicNvtObservations[genIndex].begin(),genomicNvtObservations[genIndex].end(),scList[scIndex]))/double((*samplingList)[genIndex]);
             }
         }
     }
@@ -1399,14 +1475,14 @@ int rFitMetricCalculation(int minGen,int maxScNum,int numGen,std::vector<int> &s
     // count number of timepoints at which samples are taken
     // for calculating mean frequencies
     double numberOfSamples = 0.0;
-    for (int i = 0; i < samplingList.size(); ++i) {
-        if (samplingList[i] > 0) {
+    for (unsigned int i = 0; i < samplingList->size(); ++i) {
+        if ((*samplingList)[i] > 0) {
             numberOfSamples+=1.0;
         }
     }
     
     // return comparison values
-    for (int scIndex = 0; scIndex < scList.size(); scIndex++) {
+    for (unsigned int scIndex = 0; scIndex < scList.size(); scIndex++) {
         
         // record observed timesteps
         std::vector<int> realVtScObservationTimepoints;
@@ -1421,8 +1497,8 @@ int rFitMetricCalculation(int minGen,int maxScNum,int numGen,std::vector<int> &s
         std::vector<double> simNvtScObservations;
         
         // iterate through generations
-        for (int genIndex = 0; genIndex <= numGen; ++genIndex) {
-            if (samplingList[genIndex] > 0) {
+        for (unsigned int genIndex = 0; genIndex <= samplingList->size(); ++genIndex) {
+            if ((*samplingList)[genIndex] > 0) {
                 // real VT observations
                 if (realVtScFreq[genIndex][scIndex] > 0 || realVtScObservationTimepoints.size() > 0) {
                     realVtScObservations.push_back(realVtScFreq[genIndex][scIndex]);
@@ -1452,27 +1528,27 @@ int rFitMetricCalculation(int minGen,int maxScNum,int numGen,std::vector<int> &s
             // calculate metric for real data
             std::vector<double> realTmp;
             double cumulativeFrequency = realVtScObservations[0];
-            for (int j = 1; j < realVtScObservations.size(); ++j) {
+            for (unsigned int j = 1; j < realVtScObservations.size(); ++j) {
                 cumulativeFrequency+=realVtScObservations[j];
                 double invExponent = double(realVtScObservationTimepoints[j]) - double(realVtScObservationTimepoints[0]);
                 realTmp.push_back(pow(realVtScObservations[j]/realVtScObservations[0],(1/invExponent)));
             }
             double tmp_t = 0.0;
             double tmp_c = 0.0;
-            for (int j = 0; j < realTmp.size(); ++j) {
+            for (unsigned int j = 0; j < realTmp.size(); ++j) {
                 tmp_t+=realTmp[j];
                 tmp_c++;
             }
             double realRmetric = tmp_t/tmp_c;
             // calculate metric for simulated data
             std::vector<double> simTmp;
-            for (int j = 1; j < simVtScObservations.size(); ++j) {
+            for (unsigned int j = 1; j < simVtScObservations.size(); ++j) {
                 double invExponent = double(simVtScObservationTimepoints[j]) - double(simVtScObservationTimepoints[0]);
                 simTmp.push_back(pow(simVtScObservations[j]/simVtScObservations[0],(1/invExponent)));
             }
             tmp_t = 0.0;
             tmp_c = 0.0;
-            for (int j = 0; j < simTmp.size(); ++j) {
+            for (unsigned int j = 0; j < simTmp.size(); ++j) {
                 tmp_t+=simTmp[j];
                 tmp_c++;
             }
@@ -1488,14 +1564,14 @@ int rFitMetricCalculation(int minGen,int maxScNum,int numGen,std::vector<int> &s
             // calculate metric for real data
             std::vector<double> realTmp;
             double cumulativeFrequency = realNvtScObservations[0];
-            for (int j = 1; j < realNvtScObservations.size(); ++j) {
+            for (unsigned int j = 1; j < realNvtScObservations.size(); ++j) {
                 cumulativeFrequency+=realNvtScObservations[j];
                 double invExponent = double(realNvtScObservationTimepoints[j]) - double(realNvtScObservationTimepoints[0]);
                 realTmp.push_back(pow(realNvtScObservations[j]/realNvtScObservations[0],(1/invExponent)));
             }
             double tmp_t = 0.0;
             double tmp_c = 0.0;
-            for (int j = 0; j < realTmp.size(); ++j) {
+            for (unsigned int j = 0; j < realTmp.size(); ++j) {
                 tmp_t+=realTmp[j];
                 tmp_c++;
             }
@@ -1503,13 +1579,13 @@ int rFitMetricCalculation(int minGen,int maxScNum,int numGen,std::vector<int> &s
             
             // calculate metric for simulated data
             std::vector<double> simTmp;
-            for (int j = 1; j < simNvtScObservations.size(); ++j) {
+            for (unsigned int j = 1; j < simNvtScObservations.size(); ++j) {
                 double invExponent = double(simNvtScObservationTimepoints[j]) - double(simNvtScObservationTimepoints[0]);
                 simTmp.push_back(pow(simNvtScObservations[j]/simNvtScObservations[0],(1/invExponent)));
             }
             tmp_t = 0.0;
             tmp_c = 0.0;
-            for (int j = 0; j < simTmp.size(); ++j) {
+            for (unsigned int j = 0; j < simTmp.size(); ++j) {
                 tmp_t+=simTmp[j];
                 tmp_c++;
             }
@@ -1531,7 +1607,12 @@ int rFitMetricCalculation(int minGen,int maxScNum,int numGen,std::vector<int> &s
 // write output to files //
 ///////////////////////////
 
-int printOutput(char* outputFilename,std::vector<std::string> *seroList,std::vector<std::vector<int> > &sampledSeroFreq,std::vector<int> *scList,std::vector<std::vector<int> > &vtScFreq,std::vector<std::vector<int> > &nvtScFreq,std::vector<std::string> *cogList,std::vector<double> *cogWeights,int gen,int minGen,std::vector<cog*> *accessoryLoci,std::vector<int> samplingList,std::vector<std::vector<double> > &piGen,struct parms *sp) {
+int printOutput(char* outputFilename,std::vector<std::string> *seroList,std::vector<std::vector<int> > &sampledSeroFreq,std::vector<int> *scList,std::vector<std::vector<int> > &vtScFreq,std::vector<std::vector<int> > &nvtScFreq,int gen,int minGen,std::vector<cog*> *accessoryLoci,std::vector<int> *samplingList,std::vector<std::vector<double> > &piGen,struct parms *sp) {
+    
+    // debug
+//    for (unsigned int y = 0; y < samplingList->size(); y++) {
+//        std::cerr << y << "\t" << (*samplingList)[y] << std::endl;
+//    }
     
     // parse file names
     std::stringstream prefixStream;
@@ -1585,7 +1666,7 @@ int printOutput(char* outputFilename,std::vector<std::string> *seroList,std::vec
         // write values
         for (int pseudoGen = minGen; pseudoGen < (gen+1+minGen); pseudoGen++) {
             scOutFile << pseudoGen;
-            for (int i = 0; i != scList->size(); i++) {
+            for (unsigned int i = 0; i != scList->size(); i++) {
                 scOutFile << "\t" << vtScFreq[pseudoGen-minGen][i] << "\t" << nvtScFreq[pseudoGen-minGen][i];
             }
             scOutFile << std::endl;
@@ -1600,14 +1681,14 @@ int printOutput(char* outputFilename,std::vector<std::string> *seroList,std::vec
     std::string cogOutFilename = prefix + ".cog.out";
     std::ofstream cogOutFile;
     cogOutFile.open(cogOutFilename,std::ios::out);
-    
+
     // write cog output
     if (cogOutFile.is_open()) {
         // write header
         cogOutFile << "Name\tVT\tWeight";
         int t = 0;
-        for (int g = 0; g < samplingList.size(); g++) {
-            if (samplingList[g] > 0) {
+        for (unsigned int g = 0; g < samplingList->size(); g++) {
+            if ((*samplingList)[g] > 0) {
                 if (t == 0) {
                     // need to replace with minimum generation information
                     cogOutFile << "\t" << "InitialGenomicFrequency" << "\t" << "InitialSimulatedFrequency";
@@ -1620,11 +1701,12 @@ int printOutput(char* outputFilename,std::vector<std::string> *seroList,std::vec
         }
         cogOutFile << std::endl;
         // write content
-        for (int c = 0; c < accessoryLoci->size(); c++) {
+        for (unsigned int c = 0; c < accessoryLoci->size(); c++) {
             cog tmpCog = *(*accessoryLoci)[c];
             cogOutFile << tmpCog.id << "\t" << tmpCog.vt << "\t" << tmpCog.weight;
-            for (int g = 0; g < tmpCog.actualFreq.size(); g++) {
-                if (samplingList[g] > 0) {
+//            for (unsigned int g = 0; g < tmpCog.actualFreq.size(); g++) {
+            for (unsigned int g = 0; g < samplingList->size(); g++) {
+                if ((*samplingList)[g] > 0) {
                     cogOutFile << "\t" << tmpCog.actualFreq[g] << "\t" << tmpCog.simFreq[g];
                 }
             }
@@ -1649,14 +1731,14 @@ int printOutput(char* outputFilename,std::vector<std::string> *seroList,std::vec
         if (piOutFile.is_open()) {
             // write header
             piOutFile << "Gen";
-            for (int g = 0; g < accessoryLoci->size(); g++) {
+            for (unsigned int g = 0; g < accessoryLoci->size(); g++) {
                 piOutFile << "\t" << (*accessoryLoci)[g]->id;
             }
             piOutFile << std::endl;
             // write content
             for (int pseudoGen = minGen; pseudoGen < (gen+1+minGen); pseudoGen++) {
                 piOutFile << pseudoGen;
-                for (int c = 0; c < accessoryLoci->size(); c++) {
+                for (unsigned int c = 0; c < accessoryLoci->size(); c++) {
                     piOutFile << "\t" << piGen[pseudoGen][c];
                 }
                 piOutFile << std::endl;
@@ -1704,12 +1786,12 @@ int printPop(char* prefixStar,std::string suffix,std::vector<isolate*> *currentI
         std::vector<double> currentFreq(accessoryLoci->size(),0.0);
         std::vector<isolate*>::iterator iit;
         for (iit = currentIsolates->begin(), currentIsolates->end() ; iit != currentIsolates->end(); ++iit) {
-            for (int i = 0; i < (*iit)->genotype.size(); i++) {
+            for (unsigned int i = 0; i < (*iit)->genotype.size(); i++) {
                 currentFreq[i]+=double((*iit)->genotype[i])/pSize;
             }
         }
         
-        for (int i = 0; i < accessoryLoci->size(); i++) {
+        for (unsigned int i = 0; i < accessoryLoci->size(); i++) {
             popOutFile << (*accessoryLoci)[i]->id << "\t" << currentFreq[i] << std::endl;
         }
         
@@ -1727,12 +1809,12 @@ int printPop(char* prefixStar,std::string suffix,std::vector<isolate*> *currentI
             std::vector<double> currentFreq(markerList->size(),0.0);
             std::vector<isolate*>::iterator iit;
             for (iit = currentIsolates->begin(), currentIsolates->end() ; iit != currentIsolates->end(); ++iit) {
-                for (int i = 0; i < (*iit)->markers.size(); i++) {
+                for (unsigned int i = 0; i < (*iit)->markers.size(); i++) {
                     currentFreq[i]+=double((*iit)->markers[i])/pSize;
                 }
             }
             
-            for (int i = 0; i < markerList->size(); i++) {
+            for (unsigned int i = 0; i < markerList->size(); i++) {
                 marOutFile << (*markerList)[i] << "\t" << currentFreq[i] << std::endl;
             }
             
@@ -1765,7 +1847,7 @@ int printPopSample (char* prefixStar,std::string suffix,std::vector<isolate*> *c
     // pick random sample of specified size
     std::vector<isolate*> *currentSample = new std::vector<isolate*>;
 //    std::vector<isolate*> currentSample;
-    while (currentSample->size() < sampleSize) {
+    while (currentSample->size() < unsigned(sampleSize)) {
 //        int selectedIsolateIndex = int(rand()%currentIsolates->size());
         int selectedIsolateIndex = int(double(gsl_rng_uniform(rgen))*currentIsolates->size());
         currentSample->push_back((*currentIsolates)[selectedIsolateIndex]);
@@ -1775,7 +1857,7 @@ int printPopSample (char* prefixStar,std::string suffix,std::vector<isolate*> *c
     if (popOutFile.is_open()) {
     
         // print headers
-        popOutFile << "Taxon    Time    Serotype    VT  SC";
+        popOutFile << "Taxon";
         std::vector<cog*>::iterator cit;
         for (cit = accessoryLoci->begin(), accessoryLoci->end() ; cit != accessoryLoci->end(); ++cit) {
             popOutFile << "\t" << (*cit)->id;
@@ -1786,12 +1868,7 @@ int printPopSample (char* prefixStar,std::string suffix,std::vector<isolate*> *c
         std::vector<isolate*>::iterator iit;
         for (iit = currentSample->begin(), currentSample->end() ; iit != currentSample->end(); ++iit) {
             std::string outLine = (*iit)->id;
-            // add metadata
-            std::ostringstream metaString;
-            metaString << "\t" << (*iit)->year << "\t" << (*iit)->serotype << "\t" << (*iit)->vt << "\t" << (*iit)->sc;
-            outLine.append(metaString.str());
-            // end add metadata
-            for (int i = 0; i < (*iit)->genotype.size(); i++) {
+            for (unsigned int i = 0; i < (*iit)->genotype.size(); i++) {
                 outLine.append("\t");
                 outLine.append(std::string((*iit)->genotype[i] ? "1" : "0"));
             }
@@ -1808,7 +1885,7 @@ int printPopSample (char* prefixStar,std::string suffix,std::vector<isolate*> *c
     
             // print headers
             std::string titleLine = "Marker";
-            for (int i = 0; i < markerList->size(); i++) {
+            for (unsigned int i = 0; i < markerList->size(); i++) {
                 titleLine.append("\t");
                 titleLine.append((*markerList)[i]);
             }
@@ -1818,7 +1895,7 @@ int printPopSample (char* prefixStar,std::string suffix,std::vector<isolate*> *c
             std::vector<isolate*>::iterator iit;
             for (iit = currentSample->begin(), currentSample->end() ; iit != currentSample->end(); ++iit) {
                 std::string outLine = (*iit)->id;
-                for (int i = 0; i < (*iit)->markers.size(); i++) {
+                for (unsigned int i = 0; i < (*iit)->markers.size(); i++) {
                     outLine.append("\t");
                     outLine.append(std::string((*iit)->markers[i] ? "1" : "0"));
                 }
@@ -1830,9 +1907,55 @@ int printPopSample (char* prefixStar,std::string suffix,std::vector<isolate*> *c
             return 1;
         }
     }
-            
+
+    // free memory
+    delete currentSample;
+    
     return 0;
 }
+
+/////////////
+// Tidy up //
+/////////////
+
+void tidyUpIsolates(std::vector<isolate*> *a_list, std::vector<isolate*> *b_list, std::vector<isolate*> *c_list, std::vector<isolate*> *d_list) {
+    
+    // merge lists
+    std::vector<isolate*> *isolate_list = new std::vector<isolate*>;
+    isolate_list->reserve( a_list->size() + b_list->size() + c_list->size() + d_list->size() ); // preallocate memory
+    isolate_list->insert( isolate_list->end(), a_list->begin(), a_list->end());
+    isolate_list->insert( isolate_list->end(), b_list->begin(), b_list->end());
+    isolate_list->insert( isolate_list->end(), c_list->begin(), c_list->end());
+    isolate_list->insert( isolate_list->end(), d_list->begin(), d_list->end());
+    
+    sort(isolate_list->begin(), isolate_list->end());
+    std::vector<isolate*>::iterator iit;
+    iit = unique(isolate_list->begin(), isolate_list->end());
+    isolate_list->resize(distance(isolate_list->begin(),iit));
+    
+    for (iit = isolate_list->begin(), isolate_list->end() ; iit != isolate_list->end(); ++iit) {
+        if ((*iit) != NULL) {
+            delete (*iit);
+        }
+    }
+    
+    delete isolate_list;
+}
+
+void tidyUpLoci(std::vector<cog*> *cog_list) {
+    
+    sort(cog_list->begin(), cog_list->end());
+    std::vector<cog*>::iterator cit;
+    
+    for (cit = cog_list->begin(), cog_list->end() ; cit != cog_list->end(); ++cit) {
+        if ((*cit) != NULL) {
+            delete (*cit);
+        }
+    }
+
+    delete cog_list;
+}
+
 
 //// Unsorted
 

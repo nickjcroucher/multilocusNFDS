@@ -43,7 +43,7 @@ int main(int argc, char * argv[]) {
     p.higherSelection = 1;
     p.transformationProportion = 0;
     p.transformationRate = 0;
-    p.transformationAsymmetryLoci = 1;
+    p.transformationAsymmetryLoci = 1.0;
     p.transformationAsymmetryMarker = 1;
     p.genotypeSampleSize = 0;
     
@@ -171,7 +171,7 @@ int main(int argc, char * argv[]) {
     // parse input file
     std::vector<isolate*> *population = new std::vector<isolate*>;
     std::vector<cog*> *accessoryLoci = new std::vector<cog*>;
-    std::vector<int> samplingList(p.numGen+1,0);
+    std::vector<int> *samplingList = new std::vector<int>;
     std::vector<std::string> serotypeList;
     std::vector<int> scList;
     std::vector<std::string> cogList;
@@ -182,6 +182,7 @@ int main(int argc, char * argv[]) {
         usage(argv[0]);
         return 1;
     }
+
     int genLimit = p.numGen+minGen;
 //    int maxScNum = 1+(*std::max_element(std::begin(scList),std::end(scList)));
     int maxScNum = 1+(*std::max_element(scList.begin(),scList.end()));
@@ -251,7 +252,7 @@ int main(int argc, char * argv[]) {
         eqFreq.push_back((*cit)->eqFreq);
         cogWeights.push_back((*cit)->weight);
     }
-
+    
     ////////////////////////////////////////
     // Open sampling file for comparisons //
     ////////////////////////////////////////
@@ -272,16 +273,22 @@ int main(int argc, char * argv[]) {
     // vectors for recording the current and next generation
     std::vector<isolate*> *currentIsolates = new std::vector<isolate*>;
     std::vector<isolate*> *futureIsolates = new std::vector<isolate*>;
+    std::vector<isolate*> *new_population = new std::vector<isolate*>;
     // 2D vectors for recording actual population history (integers)
     std::vector<std::vector<int> > vtScFreq(p.numGen+1,std::vector<int>(scList.size()));
     std::vector<std::vector<int> > nvtScFreq(p.numGen+1,std::vector<int>(scList.size()));
-    std::vector<std::vector<int> > cogFreq(p.numGen+1,std::vector<int>(accessoryLoci->size()));
+//    std::vector<std::vector<int> > cogFreq(p.numGen+1,std::vector<int>(accessoryLoci->size()));
     // 2D vectors for recording cog deviations
-    std::vector<std::vector<double> > piGen(p.numGen+1,std::vector<double>(accessoryLoci->size(),0.0));
+    std::vector<std::vector<double> > piGen;
+    if (p.programme == "x") {
+        piGen.resize(p.numGen+1,std::vector<double>(accessoryLoci->size(),0.0));
+    } else {
+        piGen.resize(samplingList->size()+1,std::vector<double>(accessoryLoci->size(),0.0));
+    }
     // 2D vectors for recording sampled population history (doubles)
-    std::vector<std::vector<int> > sampledSeroFreq(p.numGen+1,std::vector<int>(serotypeList.size()));
-    std::vector< std::vector<double> > sampledVtScFreq(p.numGen+1,std::vector<double>(scList.size(),0.0));
-    std::vector< std::vector<double> > sampledNvtScFreq(p.numGen+1,std::vector<double>(scList.size(),0.0));
+    std::vector<std::vector<int> > sampledSeroFreq(samplingList->size()+1,std::vector<int>(serotypeList.size()));
+    std::vector< std::vector<double> > sampledVtScFreq(samplingList->size()+1,std::vector<double>(scList.size(),0.0));
+    std::vector< std::vector<double> > sampledNvtScFreq(samplingList->size()+1,std::vector<double>(scList.size(),0.0));
     // data structures for COG frequency measurements
     std::vector<double> cogDeviations(eqFreq.size());
     
@@ -306,7 +313,7 @@ int main(int argc, char * argv[]) {
     // get sample from first generation
     int numberComparisons = 0;
     
-    int summaryCheck = summariseGeneration(currentIsolates,samplingList[0],&scList,sampledVtScFreq,sampledNvtScFreq,&serotypeList,&sampledSeroFreq[gen-minGen]);
+    int summaryCheck = summariseGeneration(currentIsolates,(*samplingList)[0],&scList,sampledVtScFreq,sampledNvtScFreq,&serotypeList,&sampledSeroFreq[gen-minGen]);
     if (summaryCheck != 0) {
         std::cerr << "Unable to summarise output of first generation" << std::endl;
         usage(argv[0]);
@@ -314,7 +321,7 @@ int main(int argc, char * argv[]) {
     }
     // for comparison for input file
     if (p.programme != "s" && p.programme != "x") {
-        int firstSampleCheck = firstSample(currentIsolates,samplingList[0],sampleOutFile,minGen);
+        int firstSampleCheck = firstSample(currentIsolates,(*samplingList)[0],sampleOutFile,minGen);
         if (firstSampleCheck != 0) {
             std::cerr << "Unable to take a random sample from first generation" << std::endl;
             usage(argv[0]);
@@ -347,27 +354,6 @@ int main(int argc, char * argv[]) {
         
     }
     
-    // recombination in first generation
-//    if (p.transformationRate > 0) {
-//        
-//        // run recombination
-//        int transformationCheck = recombination(currentIsolates,futureIsolates,population,markerFilename,p.transformationRate,p.transformationAsymmetryLoci,p.transformationAsymmetryMarker);
-//        if (transformationCheck != 0) {
-//            std::cerr << "Isolate unable to undergo recombination" << std::endl;
-//            usage(argv[0]);
-//            return 1;
-//        }
-//        
-//        // move on to next generation
-//        int nextGenerationCheck = nextGeneration(currentIsolates,futureIsolates,population);
-//        if (nextGenerationCheck != 0) {
-//            std::cerr << "Cannot store first set of recombinant isolates" << std::endl;
-//            usage(argv[0]);
-//            return 1;
-//        }
-//        
-//    }
-    
     /////////////////////////////////
     // Iterate through generations //
     /////////////////////////////////
@@ -386,18 +372,54 @@ int main(int argc, char * argv[]) {
         
         // recombination in subsequent generations
         if (p.transformationProportion > 0 && p.transformationRate > 0) {
-            int transformationCheck = recombination(currentIsolates,futureIsolates,population,markerFilename,p.transformationProportion,p.transformationRate,p.transformationAsymmetryLoci,p.transformationAsymmetryMarker,&cogWeights,&cogDeviations,&eqFreq);
+            // recombination among extant population
+            int transformationCheck = recombination(currentIsolates,futureIsolates,markerFilename,p.transformationProportion,p.transformationRate,p.transformationAsymmetryLoci,p.transformationAsymmetryMarker);
             if (transformationCheck != 0) {
-                std::cerr << "Isolate unable to undergo recombination" << std::endl;
+                std::cerr << "Extant isolates unable to undergo recombination" << std::endl;
                 return 1;
             }
-            // move on to next generation
-            int nextGenerationCheck = nextGeneration(currentIsolates,futureIsolates,population);
-            if (nextGenerationCheck != 0) {
-                std::cerr << "Cannot store first set of recombinant isolates" << std::endl;
+
+            // recombination among population of migration candidates
+            int populationTransformationCheck = recombination(population,new_population,markerFilename,p.transformationProportion,p.transformationRate,p.transformationAsymmetryLoci,p.transformationAsymmetryMarker);
+            if (populationTransformationCheck != 0) {
+                std::cerr << "Population unable to undergo recombination" << std::endl;
+                return 1;
+            }
+            // update the migrant pool population
+//            currentIsolates->swap(*futureIsolates);
+//            population->swap(*new_population);
+            
+            int nextPopulationCheck = nextGeneration(population,new_population,currentIsolates,futureIsolates);
+            if (nextPopulationCheck != 0) {
+                std::cerr << "Cannot store set of population recombinant isolates" << std::endl;
                 usage(argv[0]);
                 return 1;
             }
+            
+            if (p.immigrationRate > 0.0 && p.immigrationType == 1) {
+                int divCheck = dividePopulationForImmigration(population,&scList,populationBySc,maxScNum);
+                if (divCheck != 0) {
+                    std::cerr << "Unable to split population into sequence clusters" << std::endl;
+                    usage(argv[0]);
+                    return 1;
+                }
+            }
+            
+            // update locus frequencies post-recombination
+//            int updateCheck = update_locus_freq(futureIsolates,&cogWeights,&cogDeviations,&eqFreq);
+//            if (updateCheck != 0) {
+//                std::cerr << "Cannot update locus frequencies after recombination" << std::endl;
+//                usage(argv[0]);
+//                return 1;
+//            }
+            
+            // move on to next generation, with updated population
+//            int nextGenerationCheck = nextGeneration(currentIsolates,futureIsolates,population);
+//            if (nextGenerationCheck != 0) {
+//                std::cerr << "Cannot store set of extant recombinant isolates" << std::endl;
+//                usage(argv[0]);
+//                return 1;
+//            }
         }
         
         // allow cells to reproduce and update COG deviations array
@@ -410,16 +432,17 @@ int main(int argc, char * argv[]) {
 
         
         // move on to next generation
-        int nextGenerationCheck = nextGeneration(currentIsolates,futureIsolates,population);
-        if (nextGenerationCheck != 0) {
+        int updatePopulationCheck = updatePopulation(currentIsolates,futureIsolates);
+        if (updatePopulationCheck != 0) {
             std::cerr << "Cannot store first set of recombinant isolates" << std::endl;
             usage(argv[0]);
             return 1;
         }
         
         // compare to genomes
-        if ((gen-minGen) < samplingList.size() && samplingList[gen-minGen] > 0 && p.programme != "s" && p.programme != "x") {
-            int compareSamplesCheck = compareSamples(gen,minGen,samplingList[gen-minGen],currentIsolates,population,accessoryLoci,scList,sampledVtScFreq,sampledNvtScFreq,sampledSeroFreq[gen-minGen],serotypeList,vtCogFittingStatsList,nvtCogFittingStatsList,strainFittingStatsList,sampleOutFile);
+        unsigned int gen_diff = gen-minGen;
+        if (gen_diff < samplingList->size() && (*samplingList)[gen_diff] > 0 && p.programme != "s" && p.programme != "x") {
+            int compareSamplesCheck = compareSamples(gen,minGen,(*samplingList)[gen-minGen],currentIsolates,population,accessoryLoci,scList,sampledVtScFreq,sampledNvtScFreq,sampledSeroFreq[gen-minGen],serotypeList,vtCogFittingStatsList,nvtCogFittingStatsList,strainFittingStatsList,sampleOutFile);
             if (compareSamplesCheck != 0) {
                 std::cerr << "Unable to compare simulated and actual frequencies" << std::endl;
                 usage(argv[0]);
@@ -427,8 +450,8 @@ int main(int argc, char * argv[]) {
             } else {
                 numberComparisons++;
             }
-        } else if ((gen-minGen) < samplingList.size() && samplingList[gen-minGen] > 0 && p.programme == "s") {
-            int justRecordStatsCheck = justRecordStats(gen,minGen,samplingList[gen-minGen],currentIsolates,accessoryLoci);
+        } else if (gen_diff < samplingList->size() && (*samplingList)[gen_diff] > 0 && p.programme == "s") {
+            int justRecordStatsCheck = justRecordStats(gen,minGen,(*samplingList)[gen-minGen],currentIsolates,accessoryLoci);
             if (justRecordStatsCheck != 0) {
                 std::cerr << "Unable to record simulation statistics" << std::endl;
                 usage(argv[0]);
@@ -445,7 +468,7 @@ int main(int argc, char * argv[]) {
         
         // calculate reproductive fitness metric
         std::vector<double> rFitVector(scList.size(),0.0);
-        int rFitMetricCheck = rFitMetricCalculation(minGen,maxScNum,p.numGen,samplingList,scList,sampledVtScFreq,sampledNvtScFreq,population,rFitVector);
+        int rFitMetricCheck = rFitMetricCalculation(minGen,samplingList,scList,sampledVtScFreq,sampledNvtScFreq,population,rFitVector);
         if (rFitMetricCheck != 0) {
             std::cerr << "Unable to calculate reproductive fitness metric!" << std::endl;
             usage(argv[0]);
@@ -456,7 +479,7 @@ int main(int argc, char * argv[]) {
         double totalVtCogDeviation = 0.0;
         double totalNvtCogDeviation = 0.0;
         double totalStrainDeviation = 0.0;
-        for (int i = 0; i < vtCogFittingStatsList.size(); i++) {
+        for (unsigned int i = 0; i < vtCogFittingStatsList.size(); i++) {
             totalVtCogDeviation+=vtCogFittingStatsList[i];
             totalNvtCogDeviation+=nvtCogFittingStatsList[i];
             totalStrainDeviation+=strainFittingStatsList[i];
@@ -464,7 +487,7 @@ int main(int argc, char * argv[]) {
         
         // now add reproductive fitness deviations
         double totalRFitnessDeviation = 0.0;
-        for (int i = 0; i < scList.size(); i++) {
+        for (unsigned int i = 0; i < scList.size(); i++) {
             totalRFitnessDeviation+=rFitVector[i];
         }
         
@@ -478,7 +501,7 @@ int main(int argc, char * argv[]) {
     
     // print output files if simulating
     if (p.programme != "f") {
-        int printCheck = printOutput(outputFilename,&serotypeList,sampledSeroFreq,&scList,vtScFreq,nvtScFreq,&cogList,&cogWeights,p.numGen,minGen,accessoryLoci,samplingList,piGen,&p);
+        int printCheck = printOutput(outputFilename,&serotypeList,sampledSeroFreq,&scList,vtScFreq,nvtScFreq,p.numGen,minGen,accessoryLoci,samplingList,piGen,&p);
         if (printCheck != 0) {
             std::cerr << "Could not write to output files" << std::endl;
             usage(argv[0]);
@@ -513,6 +536,17 @@ int main(int argc, char * argv[]) {
         // sample output
         sampleOutFile.close();
     }
+    
+    /////////////
+    // Tidy up //
+    /////////////
+        
+    tidyUpIsolates(population, new_population, currentIsolates, futureIsolates);
+//    tidyUpIsolates(currentIsolates, futureIsolates);
+    
+    delete populationBySc;
+    
+    tidyUpLoci(accessoryLoci);
     
     // fin
     return 0;

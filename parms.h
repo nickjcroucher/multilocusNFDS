@@ -15,7 +15,6 @@
 #include <getopt.h>
 #include <string.h>
 #include <vector>
-#include "functions.h"
 
 // structure for storing parameters
 struct parms {
@@ -44,13 +43,16 @@ struct isolate {
     int year;
     int sc;
     std::string serotype;
-    double vt;
-    double latent_vt;
+    bool vt;
+    bool latent_vt;
     std::vector<bool> genotype;
     std::vector<bool> markers;
     
+    // new constructor for struct 'isolate'
+//    isolate(std::string init_id, int init_year, int init_sc, std::string init_serotype, bool init_vt, bool second_vt, std::vector<bool> *init_genotype, std::vector<bool> *init_markers) : id(init_id),year(init_year),sc(init_sc),serotype(init_serotype),vt(init_vt),latent_vt(second_vt),genotype(*init_genotype),markers(*init_markers) {}
+    
     // constructor for struct 'isolate'
-    isolate(std::string init_id, int init_year, int init_sc, std::string init_serotype, double init_vt, double second_vt, std::vector<bool> *init_genotype, std::vector<bool> *init_markers) {
+    isolate(std::string init_id, int init_year, int init_sc, std::string init_serotype, bool init_vt, bool second_vt, std::vector<bool> *init_genotype, std::vector<bool> *init_markers) {
         id = init_id;
         year = init_year;
         sc = init_sc;
@@ -61,13 +63,87 @@ struct isolate {
         markers = (*init_markers);
     };
     
-    // copy constructor for struct 'isolate'
-    isolate(const isolate& other): id(other.id),year(other.year),sc(other.sc),serotype(other.serotype),vt(other.vt),latent_vt(other.latent_vt),genotype(other.genotype),markers(other.markers) {}
-    
     // destructor for struct 'isolate'
-//    ~isolate ();
+//    ~isolate() {
+//        genotype.clear();
+//        genotype.shrink_to_fit();
+//        markers.clear();
+//        markers.shrink_to_fit();
+//    }
+//    
+//    // copy constructor for struct 'isolate'
+//    isolate(const isolate& other): id(other.id),year(other.year),sc(other.sc),serotype(other.serotype),vt(other.vt),latent_vt(other.latent_vt),genotype(other.genotype),markers(other.markers) {}
+//    
+//    // copy assignment operator
+//    isolate& operator=(const isolate& other) {
+//        // check for self-assignment
+//        if (&other != this) {
+//            id = other.id;
+//            year = other.year;
+//            sc = other.sc;
+//            serotype = other.serotype;
+//            vt = other.vt;
+//            latent_vt = other.latent_vt;
+//            genotype = other.genotype;
+//            markers = other.markers;
+//        }
+//        return *this;
+//    }
+//    
+//    // move constructor
+//    isolate(isolate&& other) {
+//        
+//        id = other.id;
+//        other.id = nullptr;
+//        year = other.year;
+//        other.year = nullptr;
+//        sc = other.sc;
+//        other.sc = nullptr;
+//        serotype = other.serotype;
+//        other.serotype = nullptr;
+//        vt = other.vt;
+//        other.vt = nullptr;
+//        latent_vt = other.latent_vt;
+//        other.latent_vt = nullptr;
+//        genotype = other.genotype;
+//        other.genotype = nullptr;
+//        markers = other.markers;
+//        other.markers = nullptr;
+//        
+//    }
+    
+    // move assignment operator
+//    isolate& operator=(isolate&& other) {
+//        if (&other != this) {
+//            delete p;
+//            p = other.p;
+//            other.p = nullptr;
+//
+//        }
+//        return *this;
+//    }
 
 };
+
+// constructor
+//isolate::isolate(std::string init_id, int init_year, int init_sc, std::string init_serotype, bool init_vt, bool second_vt, std::vector<bool> *init_genotype, std::vector<bool> *init_markers) {
+//    id = init_id;
+//    year = init_year;
+//    sc = init_sc;
+//    serotype = init_serotype;
+//    vt = init_vt;
+//    latent_vt = second_vt;
+//    genotype = (*init_genotype);
+//    markers = (*init_markers);
+//}
+
+// destructor
+//isolate::~isolate() {
+////    delete[] genotype;
+//    genotype = nullptr;
+////    delete[] markers;
+//    markers = nullptr;
+//}
 
 // structure for COG objects
 struct cog {
@@ -91,7 +167,7 @@ struct cog {
         simFreq = tmpSimFreq;
     };
     
-    // copy constructor for struct 'isolate'
+    // copy constructor for struct 'cog'
     cog(const cog& other): id(other.id),vt(other.vt),weight(other.weight),currentFreq(other.currentFreq),actualFreq(other.actualFreq),simFreq(other.simFreq) {}
 };
 
