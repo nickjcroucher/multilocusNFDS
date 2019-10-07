@@ -58,6 +58,9 @@ int parseOrderingFile(char* orderingFilename,std::vector<cog*> *accessoryLoci,st
 // diving population for immigration
 int dividePopulationForImmigration(std::vector<isolate*> *pop,std::vector<int> *scList,std::vector<std::vector<isolate*> > *popBySc,int maxScNum);
 
+// dividing population for immigration by time
+int dividePopulationForImmigrationByTime(std::vector<isolate*> *pop, int minGen, int numgen,std::vector<std::vector<isolate*> > *popByTime);
+
 // get isolates for starting population
 int getStartingIsolates(std::vector<isolate*> *pop,std::vector<isolate*> *first,std::vector<cog*> *accessoryLoci, int,std::vector<double> &eqFreq,std::vector<double> &cogWeights,std::vector<double> &cogDeviations,std::vector<int> &startingVtScFrequencies,std::vector<int> &startingNvtScFrequencies,std::vector<int> &scList);
 
@@ -71,14 +74,14 @@ int summariseGeneration(std::vector<isolate*> *pop,int sampleSize,std::vector<in
 int getCogDeviations(std::vector<double> * ef,std::vector<isolate*> *currentStrains,std::vector<double> *cogWeights,std::vector<double> *cogDeviations,std::vector<double> *startingCogFrequencies,std::vector<double> &startingScVtFrequencies,std::vector<double> &startingScNvtFrequencies,int);
 
 // alter vaccine formulation
-int alterVaccineFormulation(std::vector<isolate*> *currentIsolates,std::vector<isolate*> *pop,std::vector<std::vector<isolate*> > *populationBySc);
+int alterVaccineFormulation(std::vector<isolate*> *currentIsolates,std::vector<isolate*> *pop,std::vector<std::vector<std::vector<isolate*> > > *populationBySc);
 
 //////////////////////////////
 // Per-generation functions //
 //////////////////////////////
 
 // select next generation
-int reproduction(std::vector<isolate*> *currentIsolates,std::vector<isolate*> *futureIsolates,std::vector<isolate*> *pop,std::vector<std::vector<isolate*> > *popBySc,std::vector<double> *cogWeights,std::vector<double> *cogDeviations,struct parms *sp, std::vector<double> * ef, std::vector<int> * vtScFreq,std::vector<int> * nvtScFreq,std::vector<double> * piGen,std::vector<int> *scList,int gen);
+int reproduction(std::vector<isolate*> *currentIsolates,std::vector<isolate*> *futureIsolates,std::vector<std::vector<std::vector<isolate*> > > *migrantPool,std::vector<double> *cogWeights,std::vector<double> *cogDeviations,struct parms *sp, std::vector<double> * ef, std::vector<int> * vtScFreq,std::vector<int> * nvtScFreq,std::vector<double> * piGen,std::vector<int> *scList, int gen);
 
 // recombination
 int recombination(std::vector<isolate*> *currentIsolates,std::vector<isolate*> *futureIsolates,char* markerFilename,double transformationProportion,double transformationRate,double transformationAsymmetryLoci, double transformationAsymmetryMarker);

@@ -345,8 +345,8 @@ bool checkInputValues(struct parms *sp,char * inputFilename,char * vtCogName, ch
         tmpvalid = 0;
     }
     if (sp->immigrationRate > 0) {
-        if (sp->immigrationType != 0 && sp->immigrationType != 1) {
-            std::cerr << "Invalid immigration type: " << sp->immigrationType << "; should be either '0' (by isolate) or '1' (by sc)" << std::endl;
+        if (sp->immigrationType != 0 && sp->immigrationType != 1 && sp->immigrationType != 2 && sp->immigrationType != 3) {
+            std::cerr << "Invalid immigration type: " << sp->immigrationType << "; should be either '0' (by isolate),  '1' (by sc), or '2' (by time)" << std::endl;
             tmpvalid = 0;
         }
     }
@@ -620,6 +620,37 @@ int dividePopulationForImmigration(std::vector<isolate*> *pop,std::vector <int> 
     return 0;
 }
 
+/////////////////////////////////////////////
+// divide isolates by time for immigration //
+/////////////////////////////////////////////
+
+int dividePopulationForImmigrationByTime(std::vector<isolate*> *pop, int minGen, int numGen,std::vector<std::vector<isolate*> > *popByTime) {
+    
+//    std::vector<isolate*> *tmpStrains(numGen) = new std::vector<isolate*>;
+//    std::vector<std::vector<isolate*> > tmpStrains = new std::vector<std::vector<isolate*> >;
+    std::vector<std::vector<isolate*> > tmpStrains(numGen+1);
+
+    std::vector<isolate*>::iterator cit;
+    for (cit = pop->begin(), pop->end(); cit != pop->end(); ++cit) {
+        for (int t = 0; t <= numGen; t++) {
+//            std::cerr << "Isolate " << (*cit)->year << " ";
+            if (((*cit)->year)-minGen <= numGen && ((*cit)->year)-minGen >= 0) {
+                if (((*cit)->year)-minGen == t) {
+                    tmpStrains[t].push_back((*cit));
+//                    std::cerr << "Time: " << t << " size: " << tmpStrains[t].size() << std::endl;
+//                    std::cerr << " found in: " << t << std::endl;
+                }
+            }
+        }
+    }
+    
+    (*popByTime) = tmpStrains;
+
+    return 0;
+    
+}
+
+
 ///////////////////////////
 // get first year sample //
 ///////////////////////////
@@ -751,7 +782,7 @@ int summariseGeneration(std::vector<isolate*> *pop,int sampleSize,std::vector<in
 // alter vaccine formulation during simulation //
 /////////////////////////////////////////////////
 
-int alterVaccineFormulation(std::vector<isolate*> *currentIsolates,std::vector<isolate*> *pop,std::vector<std::vector<isolate*> > *popBySc) {
+int alterVaccineFormulation(std::vector<isolate*> *currentIsolates,std::vector<isolate*> *pop,std::vector<std::vector<std::vector<isolate*> > > *popBySc) {
 
     std::vector<isolate*>::iterator iter;
     
@@ -771,9 +802,11 @@ int alterVaccineFormulation(std::vector<isolate*> *currentIsolates,std::vector<i
     
     // change VT of potential immigrant isolates
     for (unsigned int i = 0; i < popBySc->size(); i++) {
-        for (iter = (*popBySc)[i].begin(), (*popBySc)[i].end(); iter != (*popBySc)[i].end(); ++iter) {
-            if (!(*iter)->vt) {
-                (*iter)->vt = (*iter)->latent_vt;
+        for (unsigned int j = 0; j < popBySc[i].size(); j++) {
+            for (iter = (*popBySc)[i][j].begin(), (*popBySc)[i][j].end(); iter != (*popBySc)[i][j].end(); ++iter) {
+                if (!(*iter)->vt) {
+                    (*iter)->vt = (*iter)->latent_vt;
+                }
             }
         }
     }
@@ -789,7 +822,7 @@ int alterVaccineFormulation(std::vector<isolate*> *currentIsolates,std::vector<i
 // select next generation in the population //
 //////////////////////////////////////////////
 
-int reproduction(std::vector<isolate*> *currentIsolates,std::vector<isolate*> *futureIsolates,std::vector<isolate*> *pop,std::vector<std::vector<isolate*> > *popBySc, std::vector<double> *cogWeights, std::vector<double> *cogDeviations,struct parms *sp, std::vector<double> * ef, std::vector<int> * vtScFreq,std::vector<int> * nvtScFreq,std::vector<double> * piGen,std::vector<int> *scList,int gen) {
+int reproduction(std::vector<isolate*> *currentIsolates,std::vector<isolate*> *futureIsolates,std::vector<std::vector<std::vector<isolate*> > > *migrantPool, std::vector<double> *cogWeights, std::vector<double> *cogDeviations,struct parms *sp, std::vector<double> * ef, std::vector<int> * vtScFreq,std::vector<int> * nvtScFreq,std::vector<double> * piGen,std::vector<int> *scList, int gen) {
     
     // new COG deviations array
     std::vector<int> futureCogCount(ef->size());
@@ -855,26 +888,50 @@ int reproduction(std::vector<isolate*> *currentIsolates,std::vector<isolate*> *f
     double adjustedImmigrationRate = (sp->immigrationRate)*(double(sp->popSize)/double(currentIsolates->size()));
     int immigrants = gsl_ran_binomial(rgen,adjustedImmigrationRate,sp->popSize);
     
+    // if mode == 2 immigration, chose the timestep
+    // from which to select the migrants
+    int migration_gen = 0;
+    if (sp->immigrationType == 2 && sp->immigrationType == 3) {
+        for (int g = 0; g <= gen; g++) {
+            std::vector<isolate*> *tmp_candidates = &(*migrantPool)[0][g];
+            if (tmp_candidates->size() >= 1) {
+                migration_gen = g;
+            }
+        }
+    }
+
     std::vector<isolate*> *candidates = new std::vector<isolate*>;
     int selection = 0;
     
     for (int f = 0; f < immigrants; f++) {
         
         if (sp->immigrationType == 0) {
-            selection = int(double(gsl_rng_uniform(rgen))*pop->size());
-            candidates = pop;
+//            selection = int(double(gsl_rng_uniform(rgen))*pop->size());
+//            candidates = pop;
+            candidates = &(*migrantPool)[0][0];
+            selection = int(double(gsl_rng_uniform(rgen))*candidates->size());
 //            selectedIsolate = (*pop)[selection];
         } else if (sp->immigrationType == 1) {
-            int selectedScIndex = int(double(gsl_rng_uniform(rgen))*scList->size());
-            candidates = &(*popBySc)[selectedScIndex];
+            int numberOfMigrantScs = (*migrantPool)[0].size();
+            int selectedScIndex = int(double(gsl_rng_uniform(rgen))*numberOfMigrantScs);
+            candidates = &(*migrantPool)[0][selectedScIndex];
             selection = int(double(gsl_rng_uniform(rgen))*candidates->size());
 //            selectedIsolate = (*candidates)[selection];
-            
+        } else if (sp->immigrationType == 2) {
+            candidates = &(*migrantPool)[0][migration_gen];
+            selection = int(double(gsl_rng_uniform(rgen))*candidates->size());
+//            std::cerr << "Selection: " << selection << " gen: " << gen << " size: " << candidates->size() << " migration_gen " << migration_gen << std::endl;
+        } else if (sp->immigrationType == 3) {
+            int numberOfMigrantScs = (*migrantPool)[migration_gen].size();
+            int selectedScIndex = int(double(gsl_rng_uniform(rgen))*numberOfMigrantScs);
+            candidates = &(*migrantPool)[migration_gen][selectedScIndex];
+            selection = int(double(gsl_rng_uniform(rgen))*candidates->size());
+
         } else {
             return 1;
         }
+
         // select isolates
-        
 //        isolate migrant = &(*candidates)[selection];
 //        isolate* selectedIsolate = new isolate((*candidates)[selection]->id,(*candidates)[selection]->year,(*candidates)[selection]->sc,(*candidates)[selection]->serotype,(*candidates)[selection]->vt,(*candidates)[selection]->latent_vt,&(*candidates)[selection]->genotype,&(*candidates)[selection]->markers);
         isolate* selectedIsolate = (*candidates)[selection];
