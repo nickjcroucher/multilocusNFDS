@@ -71,7 +71,7 @@ void usage (char* fn) {
 // parse input file //
 //////////////////////
 
-int parseInputFile(std::vector<isolate*> *pop, std::vector<cog*> *accessoryLoci, double lower, double upper,  std::vector<int> *samplingList,std::vector<std::string> *st, std::vector<int> *sc, std::vector<std::string> *cogList, char *inputFilename, char * vtCogName, int &minGen) {
+int parseInputFile(std::vector<isolate*> *pop, std::vector<cog*> *accessoryLoci, double lower, double upper,  std::vector<int> *samplingList,std::vector<std::string> *st, std::vector<int> *sc, std::vector<std::string> *cogList, char *inputFilename, char * vtCogName, int &minGen, bool useCogList) {
     
     // indices
     int s = 0;
@@ -184,58 +184,93 @@ int parseInputFile(std::vector<isolate*> *pop, std::vector<cog*> *accessoryLoci,
         }
 
         // create vector of accessory locus COG objects
-        std::vector<int> includeLocus(tmpCogList.size(),0);
-        std::vector<isolate*>::iterator iiter;
-        std::vector<std::string> intCogList;
-        for (unsigned int i = 0; i < tmpCogList.size(); i++) {
-            // data structures for recording frequencies
-            int overallFreq = 0;
-//            std::vector<double> cogFrequencies(samplingList.size(),0);
-            std::vector<double> cogFrequencies(samplingTimes.size(),0);
-            double eqFreq = 0;
-            // calculate gene frequencies from isolates
+        if (useCogList) {
+            
+            // find matching positions between pre-calculated coglist
+            // and new input file
+            std::vector<int> cogMatches;
+            if (cogMatches.size() < cogList->size()) {
+                for (unsigned int i = 0; i < cogList->size(); i++) {
+                    int match_pos = -1;
+                    for (unsigned int j = 0; j < tmpCogList.size(); j++) {
+                        if ((*cogList)[i] == tmpCogList[j]) {
+                            match_pos = j;
+                            j = tmpCogList.size();
+                        }
+                    }
+                    if (match_pos == -1) {
+                        std::cerr << "Unable to find COG " << (*cogList)[i] << " in migrant strain input file" << std::endl;
+                        return 1;
+                    } else {
+                        cogMatches.push_back(match_pos);
+                    }
+                }
+            }
+            
+            // add ordered cogs to input file
+            std::vector<isolate*>::iterator iiter;
             for (iiter = pop->begin(), pop->end() ; iiter != pop->end(); ++iiter) {
-                overallFreq+=(*iiter)->genotype[i];
-                cogFrequencies[((*iiter)->year)-minGen]+=(double((*iiter)->genotype[i])/double((*samplingList)[((*iiter)->year)-minGen]));
-                if ((*iiter)->year <= 0) {
-                    eqFreq+=(double((*iiter)->genotype[i])/double(eqPop));
+                std::vector<bool> tmpGenotype;
+                for (unsigned int j = 0; j < cogMatches.size(); j++) {
+                    tmpGenotype.push_back((*iiter)->genotype[j]);
                 }
+                (*iiter)->genotype = tmpGenotype;
             }
-            // retain if present at intermediate frequency OR vt-defining COG
-//            if ((double(overallFreq)/double(pop->size()) >= lower && double(overallFreq)/double(pop->size()) <= upper) || i == v) {
-            if ((eqFreq >= (lower-1e-07) && eqFreq <= (upper+1e-07)) || i == unsigned(v)) {
-                includeLocus[i] = 1;
-                int vtType = 0;
-                if (i == unsigned(v)) {
-                    vtType = 1;
+            
+        } else {
+            std::vector<int> includeLocus(tmpCogList.size(),0);
+            std::vector<isolate*>::iterator iiter;
+            std::vector<std::string> intCogList;
+            for (unsigned int i = 0; i < tmpCogList.size(); i++) {
+                // data structures for recording frequencies
+                int overallFreq = 0;
+    //            std::vector<double> cogFrequencies(samplingList.size(),0);
+                std::vector<double> cogFrequencies(samplingTimes.size(),0);
+                double eqFreq = 0;
+                // calculate gene frequencies from isolates
+                for (iiter = pop->begin(), pop->end() ; iiter != pop->end(); ++iiter) {
+                    overallFreq+=(*iiter)->genotype[i];
+                    cogFrequencies[((*iiter)->year)-minGen]+=(double((*iiter)->genotype[i])/double((*samplingList)[((*iiter)->year)-minGen]));
+                    if ((*iiter)->year <= 0) {
+                        eqFreq+=(double((*iiter)->genotype[i])/double(eqPop));
+                    }
                 }
-                intCogList.push_back(tmpCogList[i]);
-                cog* tmpCog = new cog(tmpCogList[i],vtType,1.0,eqFreq,&cogFrequencies);
-                if (tmpCog->id.length() > 0) {
-                    accessoryLoci->push_back(tmpCog);
+                // retain if present at intermediate frequency OR vt-defining COG
+    //            if ((double(overallFreq)/double(pop->size()) >= lower && double(overallFreq)/double(pop->size()) <= upper) || i == v) {
+                if ((eqFreq >= (lower-1e-07) && eqFreq <= (upper+1e-07)) || i == unsigned(v)) {
+                    includeLocus[i] = 1;
+                    int vtType = 0;
+                    if (i == unsigned(v)) {
+                        vtType = 1;
+                    }
+                    intCogList.push_back(tmpCogList[i]);
+                    cog* tmpCog = new cog(tmpCogList[i],vtType,1.0,eqFreq,&cogFrequencies);
+                    if (tmpCog->id.length() > 0) {
+                        accessoryLoci->push_back(tmpCog);
+                    } else {
+                        
+                        std::cerr << "Undefined COG ID at line " << i << std::endl;
+                        
+                    }
                 } else {
-                    
-                    std::cerr << "Undefined COG ID at line " << i << std::endl;
-                    
-                }
-            } else {
-                includeLocus[i] = 0;
-            }
-        }
-        
-        // recalculate isolate genotypes to only include COGs at intermediate frequency
-        for (iiter = pop->begin(), pop->end() ; iiter != pop->end(); ++iiter) {
-            std::vector<bool> tmpGenotype;
-            for (unsigned int i = 0; i < includeLocus.size(); i++) {
-                if (includeLocus[i] == 1) {
-                    tmpGenotype.push_back((*iiter)->genotype[i]);
+                    includeLocus[i] = 0;
                 }
             }
-            (*iiter)->genotype = tmpGenotype;
-        }
         
-        // return cog list
-        *cogList = intCogList;
+            // recalculate isolate genotypes to only include COGs at intermediate frequency
+            for (iiter = pop->begin(), pop->end() ; iiter != pop->end(); ++iiter) {
+                std::vector<bool> tmpGenotype;
+                for (unsigned int i = 0; i < includeLocus.size(); i++) {
+                    if (includeLocus[i] == 1) {
+                        tmpGenotype.push_back((*iiter)->genotype[i]);
+                    }
+                }
+                (*iiter)->genotype = tmpGenotype;
+            }
+        
+            // return cog list
+            *cogList = intCogList;
+        }
         
     } else {
         std::cerr << "Problem with input file: " << strerror(errno) << std::endl;
@@ -249,10 +284,10 @@ int parseInputFile(std::vector<isolate*> *pop, std::vector<cog*> *accessoryLoci,
 // parse marker information //
 //////////////////////////////
 
-int parseMarkerFile(std::vector<isolate*> *pop,char *markerFilename,std::vector<std::string> *markerList) {
+int parseMarkerFile(std::vector<isolate*> *pop,char *markerFilename,std::vector<std::string> *markerList, bool useMarkerList) {
     
-    // marker sampling data structure
-    int markerLength = 0;
+    // data structures
+    std::vector<std::string> tmpMarkerList;
     
     // parse file
     std::ifstream infile;
@@ -276,7 +311,7 @@ int parseMarkerFile(std::vector<isolate*> *pop,char *markerFilename,std::vector<
                     } else if (sIndex > 4) {
                         if (sample_id == "Taxon") {
                             // record COG names
-                            markerList->push_back(temp);
+                            tmpMarkerList.push_back(temp);
                         } else {
                             sample_markers.push_back(atoi(temp.c_str()));
                         }
@@ -284,22 +319,65 @@ int parseMarkerFile(std::vector<isolate*> *pop,char *markerFilename,std::vector<
                     sIndex++;
                 }
             }
-            if (iname != "Taxon") {
-                std::vector<isolate*>::iterator iiter;
-                for (iiter = pop->begin(), pop->end() ; iiter != pop->end(); ++iiter) {
-                    if ((*iiter)->id == sample_id) {
-                        (*iiter)->markers = sample_markers;
-                        if (sample_markers.size() > 0) {
-                            markerLength = sample_markers.size();
-                        }
-                    }
+            // record marker genotypes and attach to isolate objects
+            std::vector<isolate*>::iterator iiter;
+            for (iiter = pop->begin(), pop->end() ; iiter != pop->end(); ++iiter) {
+                if ((*iiter)->id == sample_id) {
+                    (*iiter)->markers = sample_markers;
                 }
             }
+
         }
         infile.close();
         
+        
+        // check whether markers need reordering
+        if (useMarkerList) {
+            
+            // find matching positions between pre-calculated coglist
+            // and new input file
+            
+            // data structure
+            std::vector<int> markerMatches;
+            if (markerMatches.size() < markerList->size()) {
+                for (unsigned int i = 0; i < markerList->size(); i++) {
+                    int match_pos = -1;
+                    for (unsigned int j = 0; j < tmpMarkerList.size(); j++) {
+                        if ((*markerList)[i] == tmpMarkerList[j]) {
+                            match_pos = j;
+                            j = tmpMarkerList.size();
+                        }
+                    }
+                    if (match_pos == -1) {
+                        std::cerr << "Unable to find marker " << (*markerList)[i] << " in migrant strain input file" << std::endl;
+                        return 1;
+                    } else {
+                        markerMatches.push_back(match_pos);
+                    }
+                }
+            }
+            
+            // add ordered markers to correct isolate
+            std::vector<isolate*>::iterator iiter;
+            for (iiter = pop->begin(), pop->end() ; iiter != pop->end(); ++iiter) {
+                std::vector<bool> tmpGenotype;
+                std::vector<bool> sample_markers = (*iiter)->markers;
+                for (unsigned int j = 0; j < markerMatches.size(); j++) {
+                    tmpGenotype.push_back(sample_markers[j]);
+                }
+                (*iiter)->markers = tmpGenotype;
+            }
+            
+        } else {
+            // modify marker list
+            (*markerList) = tmpMarkerList;
+            // modify individual isolates
+        }
+
+        
         // check all marker lengths are the same
         std::vector<isolate*>::iterator iiter;
+        int markerLength = tmpMarkerList.size();
         for (iiter = pop->begin(), pop->end() ; iiter != pop->end(); ++iiter) {
             if (unsigned(markerLength) != (*iiter)->markers.size()) {
                 std::cerr << "Isolate " << (*iiter)->id << " has incorrect marker information; expecting " << markerLength << " but found " << (*iiter)->markers.size() << std::endl;
@@ -315,6 +393,65 @@ int parseMarkerFile(std::vector<isolate*> *pop,char *markerFilename,std::vector<
     return 0;
     
 }
+
+//////////////////////////
+// validate input files //
+//////////////////////////
+
+int compareInputPopulations(std::vector<isolate*> *popA, std::vector<isolate*> *popB, bool check_markers) {
+    
+    int genotype_length = -1;
+    std::vector<isolate*>::iterator iter;
+    
+    // check populationA genotype lengths are consistent
+    for (iter = popA->begin(), popA->end() ; iter != popA->end(); ++iter) {
+        int current_genotype_size = (*iter)->genotype.size(); // explicit cast for precision reasons
+        if (genotype_length != -1 && genotype_length != current_genotype_size) {
+            std::cerr << "Inconsistent genotype length for isolate " << (*iter)->id << " in first population" << std::endl;
+            return 1;
+        } else {
+            genotype_length = (*iter)->genotype.size();
+        }
+    }
+
+    // check populationB genotype lengths are consistent
+    for (iter = popB->begin(), popB->end() ; iter != popB->end(); ++iter) {
+        int current_genotype_size = (*iter)->genotype.size();
+        if (genotype_length != current_genotype_size) {
+            std::cerr << "Inconsistent genotype length for isolate " << (*iter)->id << " in second population - may not match that in the first population" << std::endl;
+            return 1;
+        }
+    }
+    
+    if (check_markers) {
+        
+        genotype_length = -1;
+        
+        // check populationA genotype lengths are consistent
+        for (iter = popA->begin(), popA->end() ; iter != popA->end(); ++iter) {
+            int current_marker_size = (*iter)->markers.size();
+            if (genotype_length != -1 && genotype_length != current_marker_size) {
+                std::cerr << "Inconsistent marker genotype length for isolate " << (*iter)->id << " in first population" << std::endl;
+                return 1;
+            } else {
+                genotype_length = (*iter)->markers.size();
+            }
+        }
+        
+        // check populationB genotype lengths are consistent
+        for (iter = popB->begin(), popB->end() ; iter != popB->end(); ++iter) {
+            int current_marker_size = (*iter)->markers.size();
+            if (genotype_length != current_marker_size) {
+                std::cerr << "Inconsistent marker genotype length for isolate " << (*iter)->id << " in second population - may not match that in the first population" << std::endl;
+                return 1;
+            }
+        }
+    }
+    
+    return 0;
+    
+}
+
 
 ////////////////////////////
 // parse input parameters //
@@ -345,8 +482,8 @@ bool checkInputValues(struct parms *sp,char * inputFilename,char * vtCogName, ch
         tmpvalid = 0;
     }
     if (sp->immigrationRate > 0) {
-        if (sp->immigrationType != 0 && sp->immigrationType != 1) {
-            std::cerr << "Invalid immigration type: " << sp->immigrationType << "; should be either '0' (by isolate) or '1' (by sc)" << std::endl;
+        if (sp->immigrationType != 0 && sp->immigrationType != 1 && sp->immigrationType != 2 && sp->immigrationType != 3) {
+            std::cerr << "Invalid immigration type: " << sp->immigrationType << "; should be either '0' (by isolate),  '1' (by sc), or '2' (by time)" << std::endl;
             tmpvalid = 0;
         }
     }
@@ -620,6 +757,38 @@ int dividePopulationForImmigration(std::vector<isolate*> *pop,std::vector <int> 
     return 0;
 }
 
+/////////////////////////////////////////////
+// divide isolates by time for immigration //
+/////////////////////////////////////////////
+
+int dividePopulationForImmigrationByTime(std::vector<isolate*> *pop, int minGen, int numGen,std::vector<std::vector<isolate*> > *popByTime) {
+    
+//    std::vector<isolate*> *tmpStrains(numGen) = new std::vector<isolate*>;
+//    std::vector<std::vector<isolate*> > tmpStrains = new std::vector<std::vector<isolate*> >;
+    std::vector<std::vector<isolate*> > tmpStrains(numGen+1);
+
+    std::vector<isolate*>::iterator cit;
+    for (cit = pop->begin(), pop->end(); cit != pop->end(); ++cit) {
+        for (int t = 0; t <= numGen; t++) {
+//            std::cerr << "Isolate " << (*cit)->year << " ";
+            if (((*cit)->year)-minGen <= numGen && ((*cit)->year)-minGen >= 0) {
+                if (((*cit)->year)-minGen == t) {
+//                    popByTime[t].push_back((*cit));
+                    tmpStrains[t].push_back((*cit));
+//                    std::cerr << "Time: " << t << " size: " << tmpStrains[t].size() << std::endl;
+//                    std::cerr << " found in: " << t << std::endl;
+                }
+            }
+        }
+    }
+    
+    (*popByTime) = tmpStrains;
+
+    return 0;
+    
+}
+
+
 ///////////////////////////
 // get first year sample //
 ///////////////////////////
@@ -751,7 +920,7 @@ int summariseGeneration(std::vector<isolate*> *pop,int sampleSize,std::vector<in
 // alter vaccine formulation during simulation //
 /////////////////////////////////////////////////
 
-int alterVaccineFormulation(std::vector<isolate*> *currentIsolates,std::vector<isolate*> *pop,std::vector<std::vector<isolate*> > *popBySc) {
+int alterVaccineFormulation(std::vector<isolate*> *currentIsolates,std::vector<isolate*> *pop,std::vector<std::vector<std::vector<isolate*> > > *popBySc) {
 
     std::vector<isolate*>::iterator iter;
     
@@ -771,9 +940,11 @@ int alterVaccineFormulation(std::vector<isolate*> *currentIsolates,std::vector<i
     
     // change VT of potential immigrant isolates
     for (unsigned int i = 0; i < popBySc->size(); i++) {
-        for (iter = (*popBySc)[i].begin(), (*popBySc)[i].end(); iter != (*popBySc)[i].end(); ++iter) {
-            if (!(*iter)->vt) {
-                (*iter)->vt = (*iter)->latent_vt;
+        for (unsigned int j = 0; j < popBySc[i].size(); j++) {
+            for (iter = (*popBySc)[i][j].begin(), (*popBySc)[i][j].end(); iter != (*popBySc)[i][j].end(); ++iter) {
+                if (!(*iter)->vt) {
+                    (*iter)->vt = (*iter)->latent_vt;
+                }
             }
         }
     }
@@ -789,7 +960,21 @@ int alterVaccineFormulation(std::vector<isolate*> *currentIsolates,std::vector<i
 // select next generation in the population //
 //////////////////////////////////////////////
 
-int reproduction(std::vector<isolate*> *currentIsolates,std::vector<isolate*> *futureIsolates,std::vector<isolate*> *pop,std::vector<std::vector<isolate*> > *popBySc, std::vector<double> *cogWeights, std::vector<double> *cogDeviations,struct parms *sp, std::vector<double> * ef, std::vector<int> * vtScFreq,std::vector<int> * nvtScFreq,std::vector<double> * piGen,std::vector<int> *scList,int gen) {
+std::vector<int> getValidStrains(std::vector<std::vector<isolate*> > migrantInput) {
+    
+    std::vector<int> validStrains;
+    
+    for (unsigned int i = 0; i < migrantInput.size(); i++) {
+        if (migrantInput[i].size() >= 1) {
+            validStrains.push_back(i);
+        }
+    }
+    
+    return validStrains;
+    
+}
+
+int reproduction(std::vector<isolate*> *currentIsolates,std::vector<isolate*> *futureIsolates,std::vector<std::vector<std::vector<isolate*> > > *migrantPool, std::vector<double> *cogWeights, std::vector<double> *cogDeviations,struct parms *sp, std::vector<double> * ef, std::vector<int> * vtScFreq,std::vector<int> * nvtScFreq,std::vector<double> * piGen,std::vector<int> *scList, int gen) {
     
     // new COG deviations array
     std::vector<int> futureCogCount(ef->size());
@@ -810,7 +995,9 @@ int reproduction(std::vector<isolate*> *currentIsolates,std::vector<isolate*> *f
     // allow old generation to reproduce
     std::string oldId = "";
     double oldFitness = 0.0;
+    int debug = 0;
     for (iter = currentIsolates->begin(), currentIsolates->end(); iter != currentIsolates->end(); ++iter) {
+        debug++;
         // calculate fitness of each new genotype in population
         if ((*iter)->id != oldId) {
             
@@ -825,6 +1012,7 @@ int reproduction(std::vector<isolate*> *currentIsolates,std::vector<isolate*> *f
             if (gen >= 0 && (*iter)->vt) {
                 vaccineFit = 1.0 - double(sp->vSelection);
             }
+            
             // calculate overall fitness
             double overallFitness = baseR*vaccineFit*freqDepFit;
             oldFitness = overallFitness;
@@ -855,26 +1043,56 @@ int reproduction(std::vector<isolate*> *currentIsolates,std::vector<isolate*> *f
     double adjustedImmigrationRate = (sp->immigrationRate)*(double(sp->popSize)/double(currentIsolates->size()));
     int immigrants = gsl_ran_binomial(rgen,adjustedImmigrationRate,sp->popSize);
     
+    // if mode == 2 immigration, chose the timestep
+    // from which to select the migrants
+    int migration_gen = 0;
+    if (sp->immigrationType == 2 && sp->immigrationType == 3) {
+        for (int g = 0; g <= gen; g++) {
+            std::vector<isolate*> *tmp_candidates = &(*migrantPool)[0][g];
+            if (tmp_candidates->size() >= 1) {
+                migration_gen = g;
+            }
+        }
+    }
+
     std::vector<isolate*> *candidates = new std::vector<isolate*>;
     int selection = 0;
     
     for (int f = 0; f < immigrants; f++) {
         
         if (sp->immigrationType == 0) {
-            selection = int(double(gsl_rng_uniform(rgen))*pop->size());
-            candidates = pop;
+//            selection = int(double(gsl_rng_uniform(rgen))*pop->size());
+//            candidates = pop;
+            candidates = &(*migrantPool)[0][0];
+            selection = int(double(gsl_rng_uniform(rgen))*candidates->size());
 //            selectedIsolate = (*pop)[selection];
         } else if (sp->immigrationType == 1) {
-            int selectedScIndex = int(double(gsl_rng_uniform(rgen))*scList->size());
-            candidates = &(*popBySc)[selectedScIndex];
+//            int numberOfMigrantScs = (*migrantPool)[0].size();
+//            int selectedScIndex = int(double(gsl_rng_uniform(rgen))*numberOfMigrantScs);
+//            candidates = &(*migrantPool)[0][selectedScIndex];
+            std::vector<int> migrantStrains = getValidStrains((*migrantPool)[0]);
+            int selectedScIndex = int(double(gsl_rng_uniform(rgen))*migrantStrains.size());
+            candidates = &(*migrantPool)[0][migrantStrains[selectedScIndex]];
             selection = int(double(gsl_rng_uniform(rgen))*candidates->size());
 //            selectedIsolate = (*candidates)[selection];
-            
+        } else if (sp->immigrationType == 2) {
+            candidates = &(*migrantPool)[0][migration_gen];
+            selection = int(double(gsl_rng_uniform(rgen))*candidates->size());
+//            std::cerr << "Selection: " << selection << " gen: " << gen << " size: " << candidates->size() << " migration_gen " << migration_gen << std::endl;
+        } else if (sp->immigrationType == 3) {
+//            int numberOfMigrantScs = (*migrantPool)[migration_gen].size();
+            std::vector<int> migrantStrains = getValidStrains((*migrantPool)[migration_gen]);
+//            int selectedScIndex = int(double(gsl_rng_uniform(rgen))*numberOfMigrantScs);
+            int selectedScIndex = int(double(gsl_rng_uniform(rgen))*migrantStrains.size());
+//            candidates = &(*migrantPool)[migration_gen][selectedScIndex];
+            candidates = &(*migrantPool)[migration_gen][migrantStrains[selectedScIndex]];
+            selection = int(double(gsl_rng_uniform(rgen))*candidates->size());
+
         } else {
             return 1;
         }
+
         // select isolates
-        
 //        isolate migrant = &(*candidates)[selection];
 //        isolate* selectedIsolate = new isolate((*candidates)[selection]->id,(*candidates)[selection]->year,(*candidates)[selection]->sc,(*candidates)[selection]->serotype,(*candidates)[selection]->vt,(*candidates)[selection]->latent_vt,&(*candidates)[selection]->genotype,&(*candidates)[selection]->markers);
         isolate* selectedIsolate = (*candidates)[selection];
@@ -964,10 +1182,7 @@ bool alleleExchange (bool r, bool d, double a) {
             return false;
         }
     }
-    
-    std::cerr << "Failed to read genotype" << std::endl;
-    exit(1);
-    return false;
+
 }
 
 const std::vector<std::string> explode(const std::string& s, const char& c) {

@@ -59,14 +59,17 @@ int main(int argc, char * argv[]) {
     char* orderingFilename = NULL;
     char* vtCogName = 0;
     char* markerFilename = NULL;
+    char* migrantFilename = NULL;
+    char* migrantMarkerFilename = NULL;
     int secondVaccinationGeneration = -100;
-
+    bool migrantEvolution = 0;
+    
     if (argc == 1) {
         usage(argv[0]);
         return 1;
     } else {
         int opt = 0;
-        while ((opt = getopt(argc,argv,"hc:p:s:v:i:t:n:g:u:l:y:j:k:f:x:w:r:o:m:z:e:a:b:d:q:")) != EOF) {
+        while ((opt = getopt(argc,argv,"Ehc:p:s:v:i:t:n:g:u:l:y:j:k:f:x:w:r:o:m:z:e:a:b:d:q:1:2:")) != EOF) {
             switch (opt) {
                 case 'h':
                     usage(argv[0]);
@@ -146,6 +149,14 @@ int main(int argc, char * argv[]) {
                 case 'm':
                     markerFilename = optarg;
                     break;
+                case '1':
+                    migrantFilename = optarg;
+                    break;
+                case '2':
+                    migrantMarkerFilename = optarg;
+                    break;
+                case 'E':
+                    migrantEvolution = 1;
                 case 'd':
                     p.genotypeSampleSize = atoi(optarg);
                     break;
@@ -177,7 +188,7 @@ int main(int argc, char * argv[]) {
     std::vector<std::string> cogList;
     int minGen = 0;
     
-    int fileRead = parseInputFile(population,accessoryLoci,p.lowerLimit,p.upperLimit,samplingList,&serotypeList,&scList,&cogList,inputFilename,vtCogName,minGen);
+    int fileRead = parseInputFile(population,accessoryLoci,p.lowerLimit,p.upperLimit,samplingList,&serotypeList,&scList,&cogList,inputFilename,vtCogName,minGen,false);
     if (fileRead != 0) {
         usage(argv[0]);
         return 1;
@@ -190,7 +201,7 @@ int main(int argc, char * argv[]) {
     // add marker information if a marker file is provided
     std::vector<std::string> markerList;
     if (markerFilename != NULL) {
-        int parseMarkersCheck = parseMarkerFile(population,markerFilename,&markerList);
+        int parseMarkersCheck = parseMarkerFile(population,markerFilename,&markerList,false);
         if (parseMarkersCheck != 0) {
             std::cerr << "Unable to parse marker file correctly" << std::endl;
             usage(argv[0]);
@@ -198,20 +209,158 @@ int main(int argc, char * argv[]) {
         }
     }
     
-    //////////////////////
-    // Pre-process data //
-    //////////////////////
+    // parse migrant input file
+    std::vector<isolate*> *migrant_population = new std::vector<isolate*>;
+    std::vector<cog*> *migrant_accessoryLoci = new std::vector<cog*>;
+    std::vector<int> *migrant_samplingList = new std::vector<int>;
+    std::vector<std::string> migrant_serotypeList;
+    std::vector<int> migrant_scList;
+    std::vector< std::vector<int> > migrant_times(p.numGen);
+    int migrant_minGen = 0;
     
-    // split population for immigration by SC
-    std::vector<std::vector<isolate*> > *populationBySc = new std::vector<std::vector<isolate*> >;
-    if (p.immigrationRate > 0 && p.immigrationType == 1) {
-        int divCheck = dividePopulationForImmigration(population,&scList,populationBySc,maxScNum);
+    if (migrantFilename != NULL) {
+        int migrantFileRead = parseInputFile(migrant_population,migrant_accessoryLoci,p.lowerLimit,p.upperLimit,migrant_samplingList,&migrant_serotypeList,&migrant_scList,&cogList,migrantFilename,vtCogName,migrant_minGen,true);
+        if (migrantFileRead != 0) {
+            std::cerr << "Unable to parse migrant isolate input file correctly" << std::endl;
+            usage(argv[0]);
+            return 1;
+        }
+    }
+    
+    // parse migrant marker file
+    if (markerFilename != NULL) {
+        if (migrantMarkerFilename != NULL) {
+            int parseMigrantMarkersCheck = parseMarkerFile(migrant_population,migrantMarkerFilename,&markerList,true);
+            if (parseMigrantMarkersCheck != 0) {
+                std::cerr << "Unable to parse migrant marker file correctly" << std::endl;
+                usage(argv[0]);
+                return 1;
+            }
+        } else {
+            std::cerr << "Need a marker file for the migrant population" << std::endl;
+            usage(argv[0]);
+            return 1;
+        }
+    }
+    
+    // validate migrant strain input files
+    bool check_markers = false;
+    if (markerFilename != NULL) {
+        check_markers = true;
+    }
+    int compCheck = compareInputPopulations(population, migrant_population, check_markers);
+    if (compCheck != 0) {
+        std::cerr << "Problem with migrant strain files!" << std::endl;
+        usage(argv[0]);
+        return 1;
+    }
+    
+    ///////////////////////
+    // Prepare migration //
+    ///////////////////////
+    
+    std::vector<std::vector<std::vector<isolate*> > > *migrantPool = new std::vector<std::vector<std::vector<isolate*> > >;
+    
+    if (p.immigrationType == 1) {
+        // split population for immigration by SC
+        int divCheck = 1;
+        std::vector<std::vector<isolate*> > *populationBySc = new std::vector<std::vector<isolate*> >;
+        if (migrantFilename != NULL) {
+            divCheck = dividePopulationForImmigration(migrant_population,&scList,populationBySc,maxScNum);
+        } else {
+            divCheck = dividePopulationForImmigration(population,&scList,populationBySc,maxScNum);
+        }
         if (divCheck != 0) {
             std::cerr << "Unable to split population into sequence clusters" << std::endl;
             usage(argv[0]);
             return 1;
         }
+//        migrantPool[0] = *populationBySc;
+        migrantPool->push_back(*populationBySc);
+        
+    } else if (p.immigrationType == 2) {
+        // split population for immigration by time
+        int divCheck = 1;
+        std::vector<std::vector<isolate*> > *populationByTime = new std::vector<std::vector<isolate*> >;
+        if (migrantFilename != NULL) {
+            divCheck = dividePopulationForImmigrationByTime(migrant_population,minGen,p.numGen,populationByTime);
+        } else {
+            divCheck = dividePopulationForImmigrationByTime(population,minGen,p.numGen,populationByTime);
+        }
+        if (divCheck != 0) {
+            std::cerr << "Unable to split population by isolation times" << std::endl;
+            usage(argv[0]);
+            return 1;
+        }
+        migrantPool->push_back(*populationByTime);
+        
+    //////////////////////////////
+    // Split by time and strain //
+    //////////////////////////////
+        
+    } else if (p.immigrationType == 3) {
+        // split population for immigration by time
+        int divCheck = 1;
+//        std::vector<std::vector<isolate*> > *populationByTime = new std::vector<std::vector<isolate*> >;
+        std::vector<std::vector<isolate*> > *populationByTime = new std::vector<std::vector<isolate*> > (p.numGen+1, std::vector<isolate*>());
+        if (migrantFilename != NULL) {
+            divCheck = dividePopulationForImmigrationByTime(migrant_population,minGen,p.numGen,populationByTime);
+        } else {
+            divCheck = dividePopulationForImmigrationByTime(population,minGen,p.numGen,populationByTime);
+        }
+        if (divCheck != 0) {
+            std::cerr << "Unable to split population by isolation times" << std::endl;
+            usage(argv[0]);
+            return 1;
+        }
+        // then split each time point by strain
+        std::vector<std::vector<isolate*> > *populationByTimeAndSc = new std::vector<std::vector<isolate*> >;
+        for (int g = 0; g <= p.numGen; g++) {
+            divCheck = 1;
+            if ((*populationByTime)[g].size() >= 1) {
+                std::vector<isolate*> *tmpStrains = new std::vector<isolate*>;
+//                tmpStrains = &populationByTime[g][g]; // needs fixing
+                tmpStrains = &(*populationByTime)[g]; // needs fixing                
+                divCheck = dividePopulationForImmigration(tmpStrains,&scList,populationByTimeAndSc,maxScNum);
+                if (divCheck != 0) {
+                    std::cerr << "Unable to split population by SC for time " << g << std::endl;
+                    usage(argv[0]);
+                    return 1;
+                } else {
+                    migrantPool->push_back(*populationByTimeAndSc);
+                    
+                    
+//                    int timeAndScSize = populationByTimeAndSc->size(); // might need fixing - mainly just casting
+//                    std::cerr << "timeAndScSize: " << timeAndScSize << std::endl;
+//                    for (int l = 0; l <= timeAndScSize; l++) {
+//                        std::vector<isolate*> *tmpInput = new std::vector<isolate*>;
+//                        tmpInput = &populationByTimeAndSc[l][0]; // needs fixing
+//                        migrantPool[g].push_back(*tmpInput);
+//                        std::cerr << "l: " << l << " migrant times: " << migrant_times.size() << std::endl;
+////                        migrantPool[l+migrantPool->size()].push_back(*migrant_population);
+////                        migrant_times[g].push_back(migrantPool->size());
+//                        std::cerr << "l2: " << l << std::endl;
+//                        std::cerr << "l is " << l << " and size is " << migrantPool->size() << std::endl;
+                    
+                        
+                        
+//                    }
+                }
+            }
+        }
+//        migrantPool = populationByTime;
+
+    } else {
+        if (migrantFilename != NULL) {
+            migrantPool[0][0].push_back(*migrant_population);
+        } else {
+            migrantPool[0][0].push_back(*population);
+        }
     }
+    
+    //////////////////////
+    // Pre-process data //
+    //////////////////////
     
     // parse actual statistics
 //    if (p.programme == "s" && !(strcmp(frequencyFilename,"0"))) {
@@ -303,7 +452,7 @@ int main(int argc, char * argv[]) {
     
     // check if second vaccine formulation is implemented from the start
     if (secondVaccinationGeneration == gen) {
-        int vaccineChangeCheck = alterVaccineFormulation(currentIsolates,population,populationBySc);
+        int vaccineChangeCheck = alterVaccineFormulation(currentIsolates,population,migrantPool);
         if (vaccineChangeCheck != 0) {
             std::cerr << "Unable to correcly alter vaccine status of the population" << std::endl;
             return 1;
@@ -363,7 +512,7 @@ int main(int argc, char * argv[]) {
         
         // check if vaccine formulation changes
         if (gen == secondVaccinationGeneration) {
-            int vaccineChangeCheck = alterVaccineFormulation(currentIsolates,population,populationBySc);
+            int vaccineChangeCheck = alterVaccineFormulation(currentIsolates,population,migrantPool);
             if (vaccineChangeCheck != 0) {
                 std::cerr << "Unable to correcly alter vaccine status of the population" << std::endl;
                 return 1;
@@ -379,30 +528,80 @@ int main(int argc, char * argv[]) {
                 return 1;
             }
 
-            // recombination among population of migration candidates
-            int populationTransformationCheck = recombination(population,new_population,markerFilename,p.transformationProportion,p.transformationRate,p.transformationAsymmetryLoci,p.transformationAsymmetryMarker);
-            if (populationTransformationCheck != 0) {
-                std::cerr << "Population unable to undergo recombination" << std::endl;
-                return 1;
-            }
-            // update the migrant pool population
-//            currentIsolates->swap(*futureIsolates);
-//            population->swap(*new_population);
+            if (migrantEvolution) {
             
-            int nextPopulationCheck = nextGeneration(population,new_population,currentIsolates,futureIsolates);
-            if (nextPopulationCheck != 0) {
-                std::cerr << "Cannot store set of population recombinant isolates" << std::endl;
-                usage(argv[0]);
-                return 1;
-            }
-            
-            if (p.immigrationRate > 0.0 && p.immigrationType == 1) {
-                int divCheck = dividePopulationForImmigration(population,&scList,populationBySc,maxScNum);
-                if (divCheck != 0) {
-                    std::cerr << "Unable to split population into sequence clusters" << std::endl;
+                // recombination among population of migration candidates
+                int populationTransformationCheck = 1;
+                if (migrantFilename != NULL) {
+                    populationTransformationCheck = recombination(migrant_population,new_population,markerFilename,p.transformationProportion,p.transformationRate,p.transformationAsymmetryLoci,p.transformationAsymmetryMarker);
+                } else {
+                    populationTransformationCheck = recombination(population,new_population,markerFilename,p.transformationProportion,p.transformationRate,p.transformationAsymmetryLoci,p.transformationAsymmetryMarker);
+                }
+                if (populationTransformationCheck != 0) {
+                    std::cerr << "Population unable to undergo recombination" << std::endl;
+                    return 1;
+                }
+                
+                if (p.immigrationType == 1) {
+                    // split population for immigration by SC
+                    int divCheck = 1;
+                    std::vector<std::vector<isolate*> > *populationBySc = new std::vector<std::vector<isolate*> >;
+                    if (migrantFilename != NULL) {
+                        divCheck = dividePopulationForImmigration(migrant_population,&scList,populationBySc,maxScNum);
+                    } else {
+                        divCheck = dividePopulationForImmigration(population,&scList,populationBySc,maxScNum);
+                    }
+                    if (divCheck != 0) {
+                        std::cerr << "Unable to split population into sequence clusters" << std::endl;
+                        usage(argv[0]);
+                        return 1;
+                    }
+                    migrantPool = NULL; // better way of freeing up memory?
+                    migrantPool->push_back(*populationBySc);
+                } else if (p.immigrationType == 2) {
+                    // split population for immigration by time
+                    int divCheck = 1;
+                    std::vector<std::vector<isolate*> > *populationByTime = new std::vector<std::vector<isolate*> >;
+                    if (migrantFilename != NULL) {
+                        divCheck = dividePopulationForImmigrationByTime(migrant_population,minGen,p.numGen,populationByTime);
+                    } else {
+                        divCheck = dividePopulationForImmigrationByTime(population,minGen,p.numGen,populationByTime);
+                    }
+                    if (divCheck != 0) {
+                        std::cerr << "Unable to split population by isolation times" << std::endl;
+                        usage(argv[0]);
+                        return 1;
+                    }
+                    migrantPool = NULL;
+                    migrantPool->push_back(*populationByTime);
+//                    migrantPool = populationByTime;
+                } else {
+                    if (migrantFilename != NULL) {
+                        migrantPool[0][0].clear();
+                        migrantPool[0][0].push_back(*migrant_population);
+                    } else {
+                        migrantPool[0][0].clear();
+                        migrantPool[0][0].push_back(*population);
+
+                    }
+                }
+                
+                // update the migrant pool population
+    //            currentIsolates->swap(*futureIsolates);
+    //            population->swap(*new_population);
+                
+                int nextPopulationCheck = 1;
+                if (migrantFilename != NULL) {
+                    nextPopulationCheck = nextGeneration(migrant_population,new_population,currentIsolates,futureIsolates);
+                } else {
+                    nextPopulationCheck = nextGeneration(population,new_population,currentIsolates,futureIsolates);
+                }
+                if (nextPopulationCheck != 0) {
+                    std::cerr << "Cannot store set of population recombinant isolates" << std::endl;
                     usage(argv[0]);
                     return 1;
                 }
+                
             }
             
             // update locus frequencies post-recombination
@@ -423,7 +622,7 @@ int main(int argc, char * argv[]) {
         }
         
         // allow cells to reproduce and update COG deviations array
-        int reproCheck = reproduction(currentIsolates,futureIsolates,population,populationBySc,&cogWeights,&cogDeviations,&p,&eqFreq,&vtScFreq[gen-minGen],&nvtScFreq[gen-minGen],&piGen[gen-minGen],&scList,gen);
+        int reproCheck = reproduction(currentIsolates,futureIsolates,migrantPool,&cogWeights,&cogDeviations,&p,&eqFreq,&vtScFreq[gen-minGen],&nvtScFreq[gen-minGen],&piGen[gen-minGen],&scList,gen);
         if (reproCheck != 0) {
             std::cerr << "Population failed to reproduce at generation " << gen << std::endl;
             usage(argv[0]);
@@ -507,25 +706,22 @@ int main(int argc, char * argv[]) {
             usage(argv[0]);
             return 1;
         }
-    }
     
-    // print finishing population for simulation
-    if (p.programme == "s") {
+        // print finishing population for simulation
         int printPopCheck = printPop(outputFilename,"finalPop",currentIsolates,markerFilename,accessoryLoci,&markerList);
         if (printPopCheck != 0) {
             std::cerr << "Unable to print starting population" << std::endl;
             usage(argv[0]);
             return 1;
         }
-    }
-    if (p.genotypeSampleSize > 0) {
-        int printPopSampleCheck = printPopSample(outputFilename,"finalPopGenotypes.tab",currentIsolates,markerFilename,accessoryLoci,&markerList,p.genotypeSampleSize);
-        if (printPopSampleCheck != 0) {
-            std::cerr << "Unable to print final population sample" << std::endl;
-            usage(argv[0]);
-            return 1;
+        if (p.genotypeSampleSize > 0) {
+            int printPopSampleCheck = printPopSample(outputFilename,"finalPopGenotypes.tab",currentIsolates,markerFilename,accessoryLoci,&markerList,p.genotypeSampleSize);
+            if (printPopSampleCheck != 0) {
+                std::cerr << "Unable to print final population sample" << std::endl;
+                usage(argv[0]);
+                return 1;
+            }
         }
-        
     }
     
     /////////////////////////////////////////
@@ -543,8 +739,6 @@ int main(int argc, char * argv[]) {
         
     tidyUpIsolates(population, new_population, currentIsolates, futureIsolates);
 //    tidyUpIsolates(currentIsolates, futureIsolates);
-    
-    delete populationBySc;
     
     tidyUpLoci(accessoryLoci);
     
