@@ -188,7 +188,7 @@ int main(int argc, char * argv[]) {
     std::vector<std::string> cogList;
     int minGen = 0;
     
-    int fileRead = parseInputFile(population,accessoryLoci,p.lowerLimit,p.upperLimit,samplingList,&serotypeList,&scList,&cogList,inputFilename,vtCogName,minGen);
+    int fileRead = parseInputFile(population,accessoryLoci,p.lowerLimit,p.upperLimit,samplingList,&serotypeList,&scList,&cogList,inputFilename,vtCogName,minGen,false);
     if (fileRead != 0) {
         usage(argv[0]);
         return 1;
@@ -215,12 +215,11 @@ int main(int argc, char * argv[]) {
     std::vector<int> *migrant_samplingList = new std::vector<int>;
     std::vector<std::string> migrant_serotypeList;
     std::vector<int> migrant_scList;
-    std::vector<std::string> migrant_cogList;
     std::vector< std::vector<int> > migrant_times(p.numGen);
     int migrant_minGen = 0;
     
     if (migrantFilename != NULL) {
-        int migrantFileRead = parseInputFile(migrant_population,migrant_accessoryLoci,p.lowerLimit,p.upperLimit,migrant_samplingList,&migrant_serotypeList,&migrant_scList,&migrant_cogList,migrantFilename,vtCogName,migrant_minGen);
+        int migrantFileRead = parseInputFile(migrant_population,migrant_accessoryLoci,p.lowerLimit,p.upperLimit,migrant_samplingList,&migrant_serotypeList,&migrant_scList,&cogList,migrantFilename,vtCogName,migrant_minGen,true);
         if (migrantFileRead != 0) {
             std::cerr << "Unable to parse migrant isolate input file correctly" << std::endl;
             usage(argv[0]);
@@ -322,10 +321,7 @@ int main(int argc, char * argv[]) {
             if ((*populationByTime)[g].size() >= 1) {
                 std::vector<isolate*> *tmpStrains = new std::vector<isolate*>;
 //                tmpStrains = &populationByTime[g][g]; // needs fixing
-                tmpStrains = &(*populationByTime)[g]; // needs fixing
-                
-                std::cerr << "populationByTime size: " << (*populationByTime).size() << " size at g " << (*populationByTime)[g].size() << " first " << (*populationByTime)[g][0]->id << std::endl;
-                std::cerr << "tmpStrains! " << tmpStrains << " size " << tmpStrains->size() << " first " << (*tmpStrains)[0]->id << std::endl;
+                tmpStrains = &(*populationByTime)[g]; // needs fixing                
                 divCheck = dividePopulationForImmigration(tmpStrains,&scList,populationByTimeAndSc,maxScNum);
                 if (divCheck != 0) {
                     std::cerr << "Unable to split population by SC for time " << g << std::endl;

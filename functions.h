@@ -34,7 +34,7 @@ void usage(char *);
 ////////////////////////
 
 // parse input file
-int parseInputFile(std::vector<isolate*> *pop, std::vector<cog*> *accessoryLoci, double lower, double upper, std::vector<int> *samplingList, std::vector<std::string> *serotypeList, std::vector<int> *scList, std::vector<std::string> *cogList, char *inputFilename, char * vtCogName,int&);
+int parseInputFile(std::vector<isolate*> *pop, std::vector<cog*> *accessoryLoci, double lower, double upper, std::vector<int> *samplingList, std::vector<std::string> *serotypeList, std::vector<int> *scList, std::vector<std::string> *cogList, char *inputFilename, char * vtCogName,int&, bool useCogList);
 
 // check input values
 bool checkInputValues(struct parms *sp, char* inputFilename, char* vtCogName, char* propFile, char *weightFile);

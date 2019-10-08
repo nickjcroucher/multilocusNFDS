@@ -71,7 +71,7 @@ void usage (char* fn) {
 // parse input file //
 //////////////////////
 
-int parseInputFile(std::vector<isolate*> *pop, std::vector<cog*> *accessoryLoci, double lower, double upper,  std::vector<int> *samplingList,std::vector<std::string> *st, std::vector<int> *sc, std::vector<std::string> *cogList, char *inputFilename, char * vtCogName, int &minGen) {
+int parseInputFile(std::vector<isolate*> *pop, std::vector<cog*> *accessoryLoci, double lower, double upper,  std::vector<int> *samplingList,std::vector<std::string> *st, std::vector<int> *sc, std::vector<std::string> *cogList, char *inputFilename, char * vtCogName, int &minGen, bool useCogList) {
     
     // indices
     int s = 0;
@@ -184,58 +184,92 @@ int parseInputFile(std::vector<isolate*> *pop, std::vector<cog*> *accessoryLoci,
         }
 
         // create vector of accessory locus COG objects
-        std::vector<int> includeLocus(tmpCogList.size(),0);
-        std::vector<isolate*>::iterator iiter;
-        std::vector<std::string> intCogList;
-        for (unsigned int i = 0; i < tmpCogList.size(); i++) {
-            // data structures for recording frequencies
-            int overallFreq = 0;
-//            std::vector<double> cogFrequencies(samplingList.size(),0);
-            std::vector<double> cogFrequencies(samplingTimes.size(),0);
-            double eqFreq = 0;
-            // calculate gene frequencies from isolates
+        if (useCogList) {
+            
+            // find matching positions between pre-calculated coglist
+            // and new input file
+            std::vector<int> cogMatches;
+            if (cogMatches.size() < cogList->size()) {
+                for (unsigned int i = 0; i < cogList->size(); i++) {
+                    int match_pos = -1;
+                    for (unsigned int j = 0; j < tmpCogList.size(); j++) {
+                        if ((*cogList)[i] == tmpCogList[j]) {
+                            match_pos = j;
+                        }
+                    }
+                    if (match_pos == -1) {
+                        std::cerr << "Unable to find COG " << (*cogList)[i] << " in migrant strain input file" << std::endl;
+                        return 1;
+                    } else {
+                        cogMatches.push_back(match_pos);
+                    }
+                }
+            }
+            
+            // add ordered cogs to input file
+            std::vector<isolate*>::iterator iiter;
             for (iiter = pop->begin(), pop->end() ; iiter != pop->end(); ++iiter) {
-                overallFreq+=(*iiter)->genotype[i];
-                cogFrequencies[((*iiter)->year)-minGen]+=(double((*iiter)->genotype[i])/double((*samplingList)[((*iiter)->year)-minGen]));
-                if ((*iiter)->year <= 0) {
-                    eqFreq+=(double((*iiter)->genotype[i])/double(eqPop));
+                std::vector<bool> tmpGenotype;
+                for (unsigned int j = 0; j < cogMatches.size(); j++) {
+                    tmpGenotype.push_back((*iiter)->genotype[j]);
                 }
+                (*iiter)->genotype = tmpGenotype;
             }
-            // retain if present at intermediate frequency OR vt-defining COG
-//            if ((double(overallFreq)/double(pop->size()) >= lower && double(overallFreq)/double(pop->size()) <= upper) || i == v) {
-            if ((eqFreq >= (lower-1e-07) && eqFreq <= (upper+1e-07)) || i == unsigned(v)) {
-                includeLocus[i] = 1;
-                int vtType = 0;
-                if (i == unsigned(v)) {
-                    vtType = 1;
+            
+        } else {
+            std::vector<int> includeLocus(tmpCogList.size(),0);
+            std::vector<isolate*>::iterator iiter;
+            std::vector<std::string> intCogList;
+            for (unsigned int i = 0; i < tmpCogList.size(); i++) {
+                // data structures for recording frequencies
+                int overallFreq = 0;
+    //            std::vector<double> cogFrequencies(samplingList.size(),0);
+                std::vector<double> cogFrequencies(samplingTimes.size(),0);
+                double eqFreq = 0;
+                // calculate gene frequencies from isolates
+                for (iiter = pop->begin(), pop->end() ; iiter != pop->end(); ++iiter) {
+                    overallFreq+=(*iiter)->genotype[i];
+                    cogFrequencies[((*iiter)->year)-minGen]+=(double((*iiter)->genotype[i])/double((*samplingList)[((*iiter)->year)-minGen]));
+                    if ((*iiter)->year <= 0) {
+                        eqFreq+=(double((*iiter)->genotype[i])/double(eqPop));
+                    }
                 }
-                intCogList.push_back(tmpCogList[i]);
-                cog* tmpCog = new cog(tmpCogList[i],vtType,1.0,eqFreq,&cogFrequencies);
-                if (tmpCog->id.length() > 0) {
-                    accessoryLoci->push_back(tmpCog);
+                // retain if present at intermediate frequency OR vt-defining COG
+    //            if ((double(overallFreq)/double(pop->size()) >= lower && double(overallFreq)/double(pop->size()) <= upper) || i == v) {
+                if ((eqFreq >= (lower-1e-07) && eqFreq <= (upper+1e-07)) || i == unsigned(v)) {
+                    includeLocus[i] = 1;
+                    int vtType = 0;
+                    if (i == unsigned(v)) {
+                        vtType = 1;
+                    }
+                    intCogList.push_back(tmpCogList[i]);
+                    cog* tmpCog = new cog(tmpCogList[i],vtType,1.0,eqFreq,&cogFrequencies);
+                    if (tmpCog->id.length() > 0) {
+                        accessoryLoci->push_back(tmpCog);
+                    } else {
+                        
+                        std::cerr << "Undefined COG ID at line " << i << std::endl;
+                        
+                    }
                 } else {
-                    
-                    std::cerr << "Undefined COG ID at line " << i << std::endl;
-                    
-                }
-            } else {
-                includeLocus[i] = 0;
-            }
-        }
-        
-        // recalculate isolate genotypes to only include COGs at intermediate frequency
-        for (iiter = pop->begin(), pop->end() ; iiter != pop->end(); ++iiter) {
-            std::vector<bool> tmpGenotype;
-            for (unsigned int i = 0; i < includeLocus.size(); i++) {
-                if (includeLocus[i] == 1) {
-                    tmpGenotype.push_back((*iiter)->genotype[i]);
+                    includeLocus[i] = 0;
                 }
             }
-            (*iiter)->genotype = tmpGenotype;
-        }
         
-        // return cog list
-        *cogList = intCogList;
+            // recalculate isolate genotypes to only include COGs at intermediate frequency
+            for (iiter = pop->begin(), pop->end() ; iiter != pop->end(); ++iiter) {
+                std::vector<bool> tmpGenotype;
+                for (unsigned int i = 0; i < includeLocus.size(); i++) {
+                    if (includeLocus[i] == 1) {
+                        tmpGenotype.push_back((*iiter)->genotype[i]);
+                    }
+                }
+                (*iiter)->genotype = tmpGenotype;
+            }
+        
+            // return cog list
+            *cogList = intCogList;
+        }
         
     } else {
         std::cerr << "Problem with input file: " << strerror(errno) << std::endl;
@@ -935,11 +969,6 @@ int reproduction(std::vector<isolate*> *currentIsolates,std::vector<isolate*> *f
             double overallFitness = baseR*vaccineFit*freqDepFit;
             oldFitness = overallFitness;
             oldId = (*iter)->id;
-            
-            // escape
-            if (gen > 1) {
-                std::cerr << "Count: " << debug << " id: " << (*iter)->id << std::endl;
-            }
             
         }
         // select offspring by Poisson distribution
