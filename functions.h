@@ -42,6 +42,9 @@ bool checkInputValues(struct parms *sp, char* inputFilename, char* vtCogName, ch
 // parse marker file
 int parseMarkerFile(std::vector<isolate*> *pop,char *markerFilename,std::vector<std::string> *markerList);
 
+// validate input files
+int compareInputPopulations(std::vector<isolate*> *popA, std::vector<isolate*> *popB, bool check_markers);
+
 // parse frequency file
 int parseFrequencyFile(char *frequencyFilename,std::vector<cog*> *accessoryLoci);
 
@@ -54,6 +57,9 @@ int parseOrderingFile(char* orderingFilename,std::vector<cog*> *accessoryLoci,st
 ////////////////////////////////
 // Pre-processing information //
 ////////////////////////////////
+
+// picking out valid strains for migration
+std::vector<int> getValidStrains(std::vector<std::vector<isolate*> > migrantInput);
 
 // diving population for immigration
 int dividePopulationForImmigration(std::vector<isolate*> *pop,std::vector<int> *scList,std::vector<std::vector<isolate*> > *popBySc,int maxScNum);

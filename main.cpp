@@ -245,8 +245,17 @@ int main(int argc, char * argv[]) {
         }
     }
     
-    
-    // matched time migration!!
+    // validate migrant strain input files
+    bool check_markers = false;
+    if (markerFilename != NULL) {
+        check_markers = true;
+    }
+    int compCheck = compareInputPopulations(population, migrant_population, check_markers);
+    if (compCheck != 0) {
+        std::cerr << "Problem with migrant strain files!" << std::endl;
+        usage(argv[0]);
+        return 1;
+    }
     
     ///////////////////////
     // Prepare migration //
@@ -294,7 +303,8 @@ int main(int argc, char * argv[]) {
     } else if (p.immigrationType == 3) {
         // split population for immigration by time
         int divCheck = 1;
-        std::vector<std::vector<isolate*> > *populationByTime = new std::vector<std::vector<isolate*> >;
+//        std::vector<std::vector<isolate*> > *populationByTime = new std::vector<std::vector<isolate*> >;
+        std::vector<std::vector<isolate*> > *populationByTime = new std::vector<std::vector<isolate*> > (p.numGen+1, std::vector<isolate*>());
         if (migrantFilename != NULL) {
             divCheck = dividePopulationForImmigrationByTime(migrant_population,minGen,p.numGen,populationByTime);
         } else {
@@ -309,12 +319,12 @@ int main(int argc, char * argv[]) {
         std::vector<std::vector<isolate*> > *populationByTimeAndSc = new std::vector<std::vector<isolate*> >;
         for (int g = 0; g <= p.numGen; g++) {
             divCheck = 1;
-            if (populationByTime[g].size() >= 1) {
+            if ((*populationByTime)[g].size() >= 1) {
                 std::vector<isolate*> *tmpStrains = new std::vector<isolate*>;
 //                tmpStrains = &populationByTime[g][g]; // needs fixing
-                tmpStrains = &(populationByTime[g][0]); // needs fixing
+                tmpStrains = &(*populationByTime)[g]; // needs fixing
                 
-                std::cerr << "populationByTime size: " << populationByTime->size() << " size at g " << populationByTime[g].size() << " first " << populationByTime[g][0][0]->id << std::endl;
+                std::cerr << "populationByTime size: " << (*populationByTime).size() << " size at g " << (*populationByTime)[g].size() << " first " << (*populationByTime)[g][0]->id << std::endl;
                 std::cerr << "tmpStrains! " << tmpStrains << " size " << tmpStrains->size() << " first " << (*tmpStrains)[0]->id << std::endl;
                 divCheck = dividePopulationForImmigration(tmpStrains,&scList,populationByTimeAndSc,maxScNum);
                 if (divCheck != 0) {
