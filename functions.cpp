@@ -402,7 +402,8 @@ int compareInputPopulations(std::vector<isolate*> *popA, std::vector<isolate*> *
     
     // check populationA genotype lengths are consistent
     for (iter = popA->begin(), popA->end() ; iter != popA->end(); ++iter) {
-        if (genotype_length != -1 && genotype_length != (*iter)->genotype.size()) {
+        int current_genotype_size = (*iter)->genotype.size(); // explicit cast for precision reasons
+        if (genotype_length != -1 && genotype_length != current_genotype_size) {
             std::cerr << "Inconsistent genotype length for isolate " << (*iter)->id << " in first population" << std::endl;
             return 1;
         } else {
@@ -412,7 +413,8 @@ int compareInputPopulations(std::vector<isolate*> *popA, std::vector<isolate*> *
 
     // check populationB genotype lengths are consistent
     for (iter = popB->begin(), popB->end() ; iter != popB->end(); ++iter) {
-        if (genotype_length != (*iter)->genotype.size()) {
+        int current_genotype_size = (*iter)->genotype.size();
+        if (genotype_length != current_genotype_size) {
             std::cerr << "Inconsistent genotype length for isolate " << (*iter)->id << " in second population - may not match that in the first population" << std::endl;
             return 1;
         }
@@ -424,7 +426,8 @@ int compareInputPopulations(std::vector<isolate*> *popA, std::vector<isolate*> *
         
         // check populationA genotype lengths are consistent
         for (iter = popA->begin(), popA->end() ; iter != popA->end(); ++iter) {
-            if (genotype_length != -1 && genotype_length != (*iter)->markers.size()) {
+            int current_marker_size = (*iter)->markers.size();
+            if (genotype_length != -1 && genotype_length != current_marker_size) {
                 std::cerr << "Inconsistent marker genotype length for isolate " << (*iter)->id << " in first population" << std::endl;
                 return 1;
             } else {
@@ -434,7 +437,8 @@ int compareInputPopulations(std::vector<isolate*> *popA, std::vector<isolate*> *
         
         // check populationB genotype lengths are consistent
         for (iter = popB->begin(), popB->end() ; iter != popB->end(); ++iter) {
-            if (genotype_length != (*iter)->markers.size()) {
+            int current_marker_size = (*iter)->markers.size();
+            if (genotype_length != current_marker_size) {
                 std::cerr << "Inconsistent marker genotype length for isolate " << (*iter)->id << " in second population - may not match that in the first population" << std::endl;
                 return 1;
             }
@@ -957,7 +961,7 @@ std::vector<int> getValidStrains(std::vector<std::vector<isolate*> > migrantInpu
     
     std::vector<int> validStrains;
     
-    for (int i = 0; i < migrantInput.size(); i++) {
+    for (unsigned int i = 0; i < migrantInput.size(); i++) {
         if (migrantInput[i].size() >= 1) {
             validStrains.push_back(i);
         }
