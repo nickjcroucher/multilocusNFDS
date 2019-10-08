@@ -236,7 +236,7 @@ int main(int argc, char * argv[]) {
                 usage(argv[0]);
                 return 1;
             }
-        } else {
+        } else if (p.immigrationType >= 2) {
             std::cerr << "Need a marker file for the migrant population" << std::endl;
             usage(argv[0]);
             return 1;
