@@ -201,7 +201,7 @@ int main(int argc, char * argv[]) {
     // add marker information if a marker file is provided
     std::vector<std::string> markerList;
     if (markerFilename != NULL) {
-        int parseMarkersCheck = parseMarkerFile(population,markerFilename,&markerList);
+        int parseMarkersCheck = parseMarkerFile(population,markerFilename,&markerList,false);
         if (parseMarkersCheck != 0) {
             std::cerr << "Unable to parse marker file correctly" << std::endl;
             usage(argv[0]);
@@ -228,10 +228,9 @@ int main(int argc, char * argv[]) {
     }
     
     // parse migrant marker file
-    std::vector<std::string> migrant_markerList;
     if (markerFilename != NULL) {
         if (migrantMarkerFilename != NULL) {
-            int parseMigrantMarkersCheck = parseMarkerFile(migrant_population,migrantMarkerFilename,&migrant_markerList);
+            int parseMigrantMarkersCheck = parseMarkerFile(migrant_population,migrantMarkerFilename,&markerList,true);
             if (parseMigrantMarkersCheck != 0) {
                 std::cerr << "Unable to parse migrant marker file correctly" << std::endl;
                 usage(argv[0]);

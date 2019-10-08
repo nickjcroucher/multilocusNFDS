@@ -40,7 +40,7 @@ int parseInputFile(std::vector<isolate*> *pop, std::vector<cog*> *accessoryLoci,
 bool checkInputValues(struct parms *sp, char* inputFilename, char* vtCogName, char* propFile, char *weightFile);
 
 // parse marker file
-int parseMarkerFile(std::vector<isolate*> *pop,char *markerFilename,std::vector<std::string> *markerList);
+int parseMarkerFile(std::vector<isolate*> *pop,char *markerFilename,std::vector<std::string> *markerList, bool useMarkerList);
 
 // validate input files
 int compareInputPopulations(std::vector<isolate*> *popA, std::vector<isolate*> *popB, bool check_markers);

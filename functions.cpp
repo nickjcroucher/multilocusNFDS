@@ -283,10 +283,11 @@ int parseInputFile(std::vector<isolate*> *pop, std::vector<cog*> *accessoryLoci,
 // parse marker information //
 //////////////////////////////
 
-int parseMarkerFile(std::vector<isolate*> *pop,char *markerFilename,std::vector<std::string> *markerList) {
+int parseMarkerFile(std::vector<isolate*> *pop,char *markerFilename,std::vector<std::string> *markerList, bool useMarkerList) {
     
     // marker sampling data structure
     int markerLength = 0;
+    std::vector<std::string> tmpMarkerList;
     
     // parse file
     std::ifstream infile;
@@ -310,7 +311,7 @@ int parseMarkerFile(std::vector<isolate*> *pop,char *markerFilename,std::vector<
                     } else if (sIndex > 4) {
                         if (sample_id == "Taxon") {
                             // record COG names
-                            markerList->push_back(temp);
+                            tmpMarkerList.push_back(temp);
                         } else {
                             sample_markers.push_back(atoi(temp.c_str()));
                         }
@@ -320,14 +321,54 @@ int parseMarkerFile(std::vector<isolate*> *pop,char *markerFilename,std::vector<
             }
             if (iname != "Taxon") {
                 std::vector<isolate*>::iterator iiter;
-                for (iiter = pop->begin(), pop->end() ; iiter != pop->end(); ++iiter) {
-                    if ((*iiter)->id == sample_id) {
-                        (*iiter)->markers = sample_markers;
-                        if (sample_markers.size() > 0) {
-                            markerLength = sample_markers.size();
+                if (useMarkerList) {
+                    
+                    // find matching positions between pre-calculated coglist
+                    // and new input file
+                    std::vector<int> markerMatches;
+                    if (markerMatches.size() < markerList->size()) {
+                        for (unsigned int i = 0; i < markerList->size(); i++) {
+                            int match_pos = -1;
+                            for (unsigned int j = 0; j < tmpMarkerList.size(); j++) {
+                                if ((*markerList)[i] == tmpMarkerList[j]) {
+                                    match_pos = j;
+                                }
+                            }
+                            if (match_pos == -1) {
+                                std::cerr << "Unable to find marker " << (*markerList)[i] << " in migrant strain input file" << std::endl;
+                                return 1;
+                            } else {
+                                markerMatches.push_back(match_pos);
+                            }
+                        }
+                    }
+                    
+                    // add ordered markers to correct isolate
+                    std::vector<isolate*>::iterator iiter;
+                    for (iiter = pop->begin(), pop->end() ; iiter != pop->end(); ++iiter) {
+                        if ((*iiter)->id == sample_id) {
+                            std::vector<bool> tmpGenotype;
+                            for (unsigned int j = 0; j < markerMatches.size(); j++) {
+                                tmpGenotype.push_back(sample_markers[j]);
+                            }
+                            (*iiter)->markers = tmpGenotype;
+                        }
+                    }
+                    
+                } else {
+                    // modify marker list
+                    (*markerList) = tmpMarkerList;
+                    // modify individual isolates
+                    for (iiter = pop->begin(), pop->end() ; iiter != pop->end(); ++iiter) {
+                        if ((*iiter)->id == sample_id) {
+                            (*iiter)->markers = sample_markers;
+                            if (sample_markers.size() > 0) {
+                                markerLength = sample_markers.size();
+                            }
                         }
                     }
                 }
+                
             }
         }
         infile.close();
