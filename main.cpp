@@ -706,25 +706,22 @@ int main(int argc, char * argv[]) {
             usage(argv[0]);
             return 1;
         }
-    }
     
-    // print finishing population for simulation
-    if (p.programme == "s") {
+        // print finishing population for simulation
         int printPopCheck = printPop(outputFilename,"finalPop",currentIsolates,markerFilename,accessoryLoci,&markerList);
         if (printPopCheck != 0) {
             std::cerr << "Unable to print starting population" << std::endl;
             usage(argv[0]);
             return 1;
         }
-    }
-    if (p.genotypeSampleSize > 0) {
-        int printPopSampleCheck = printPopSample(outputFilename,"finalPopGenotypes.tab",currentIsolates,markerFilename,accessoryLoci,&markerList,p.genotypeSampleSize);
-        if (printPopSampleCheck != 0) {
-            std::cerr << "Unable to print final population sample" << std::endl;
-            usage(argv[0]);
-            return 1;
+        if (p.genotypeSampleSize > 0) {
+            int printPopSampleCheck = printPopSample(outputFilename,"finalPopGenotypes.tab",currentIsolates,markerFilename,accessoryLoci,&markerList,p.genotypeSampleSize);
+            if (printPopSampleCheck != 0) {
+                std::cerr << "Unable to print final population sample" << std::endl;
+                usage(argv[0]);
+                return 1;
+            }
         }
-        
     }
     
     /////////////////////////////////////////

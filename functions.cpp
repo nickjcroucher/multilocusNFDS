@@ -195,6 +195,7 @@ int parseInputFile(std::vector<isolate*> *pop, std::vector<cog*> *accessoryLoci,
                     for (unsigned int j = 0; j < tmpCogList.size(); j++) {
                         if ((*cogList)[i] == tmpCogList[j]) {
                             match_pos = j;
+                            j = tmpCogList.size();
                         }
                     }
                     if (match_pos == -1) {
@@ -285,8 +286,7 @@ int parseInputFile(std::vector<isolate*> *pop, std::vector<cog*> *accessoryLoci,
 
 int parseMarkerFile(std::vector<isolate*> *pop,char *markerFilename,std::vector<std::string> *markerList, bool useMarkerList) {
     
-    // marker sampling data structure
-    int markerLength = 0;
+    // data structures
     std::vector<std::string> tmpMarkerList;
     
     // parse file
@@ -319,62 +319,65 @@ int parseMarkerFile(std::vector<isolate*> *pop,char *markerFilename,std::vector<
                     sIndex++;
                 }
             }
-            if (iname != "Taxon") {
-                std::vector<isolate*>::iterator iiter;
-                if (useMarkerList) {
-                    
-                    // find matching positions between pre-calculated coglist
-                    // and new input file
-                    std::vector<int> markerMatches;
-                    if (markerMatches.size() < markerList->size()) {
-                        for (unsigned int i = 0; i < markerList->size(); i++) {
-                            int match_pos = -1;
-                            for (unsigned int j = 0; j < tmpMarkerList.size(); j++) {
-                                if ((*markerList)[i] == tmpMarkerList[j]) {
-                                    match_pos = j;
-                                }
-                            }
-                            if (match_pos == -1) {
-                                std::cerr << "Unable to find marker " << (*markerList)[i] << " in migrant strain input file" << std::endl;
-                                return 1;
-                            } else {
-                                markerMatches.push_back(match_pos);
-                            }
-                        }
-                    }
-                    
-                    // add ordered markers to correct isolate
-                    std::vector<isolate*>::iterator iiter;
-                    for (iiter = pop->begin(), pop->end() ; iiter != pop->end(); ++iiter) {
-                        if ((*iiter)->id == sample_id) {
-                            std::vector<bool> tmpGenotype;
-                            for (unsigned int j = 0; j < markerMatches.size(); j++) {
-                                tmpGenotype.push_back(sample_markers[j]);
-                            }
-                            (*iiter)->markers = tmpGenotype;
-                        }
-                    }
-                    
-                } else {
-                    // modify marker list
-                    (*markerList) = tmpMarkerList;
-                    // modify individual isolates
-                    for (iiter = pop->begin(), pop->end() ; iiter != pop->end(); ++iiter) {
-                        if ((*iiter)->id == sample_id) {
-                            (*iiter)->markers = sample_markers;
-                            if (sample_markers.size() > 0) {
-                                markerLength = sample_markers.size();
-                            }
-                        }
-                    }
+            // record marker genotypes and attach to isolate objects
+            std::vector<isolate*>::iterator iiter;
+            for (iiter = pop->begin(), pop->end() ; iiter != pop->end(); ++iiter) {
+                if ((*iiter)->id == sample_id) {
+                    (*iiter)->markers = sample_markers;
                 }
-                
             }
+
         }
         infile.close();
         
+        
+        // check whether markers need reordering
+        if (useMarkerList) {
+            
+            // find matching positions between pre-calculated coglist
+            // and new input file
+            
+            // data structure
+            std::vector<int> markerMatches;
+            if (markerMatches.size() < markerList->size()) {
+                for (unsigned int i = 0; i < markerList->size(); i++) {
+                    int match_pos = -1;
+                    for (unsigned int j = 0; j < tmpMarkerList.size(); j++) {
+                        if ((*markerList)[i] == tmpMarkerList[j]) {
+                            match_pos = j;
+                            j = tmpMarkerList.size();
+                        }
+                    }
+                    if (match_pos == -1) {
+                        std::cerr << "Unable to find marker " << (*markerList)[i] << " in migrant strain input file" << std::endl;
+                        return 1;
+                    } else {
+                        markerMatches.push_back(match_pos);
+                    }
+                }
+            }
+            
+            // add ordered markers to correct isolate
+            std::vector<isolate*>::iterator iiter;
+            for (iiter = pop->begin(), pop->end() ; iiter != pop->end(); ++iiter) {
+                std::vector<bool> tmpGenotype;
+                std::vector<bool> sample_markers = (*iiter)->markers;
+                for (unsigned int j = 0; j < markerMatches.size(); j++) {
+                    tmpGenotype.push_back(sample_markers[j]);
+                }
+                (*iiter)->markers = tmpGenotype;
+            }
+            
+        } else {
+            // modify marker list
+            (*markerList) = tmpMarkerList;
+            // modify individual isolates
+        }
+
+        
         // check all marker lengths are the same
         std::vector<isolate*>::iterator iiter;
+        int markerLength = tmpMarkerList.size();
         for (iiter = pop->begin(), pop->end() ; iiter != pop->end(); ++iiter) {
             if (unsigned(markerLength) != (*iiter)->markers.size()) {
                 std::cerr << "Isolate " << (*iiter)->id << " has incorrect marker information; expecting " << markerLength << " but found " << (*iiter)->markers.size() << std::endl;
