@@ -776,8 +776,8 @@ int generateMigrantPool(std::vector<std::vector<std::vector<isolate*> > > *migra
             return 1;
         }
         // then split each time point by strain
-        std::vector<std::vector<isolate*> > *populationByTimeAndSc = new std::vector<std::vector<isolate*> >;
         for (int g = 0; g <= p->numGen; g++) {
+            std::vector<std::vector<isolate*> > *populationByTimeAndSc = new std::vector<std::vector<isolate*> >;
             if ((*populationByTime)[g].size() >= 1) {
                 std::vector<isolate*> *tmpStrains = new std::vector<isolate*>;
                 tmpStrains = &(*populationByTime)[g]; // needs fixing
@@ -788,6 +788,8 @@ int generateMigrantPool(std::vector<std::vector<std::vector<isolate*> > > *migra
                 } else {
                     migrantPool->push_back(*populationByTimeAndSc);
                 }
+            } else {
+                migrantPool->push_back(*populationByTimeAndSc);
             }
         }
     // Do not split, just sample at random
@@ -1127,7 +1129,7 @@ int reproduction(std::vector<isolate*> *currentIsolates,std::vector<isolate*> *f
     int migration_gen = 0;
     if (sp->immigrationType == 2 || sp->immigrationType == 3) {
         for (int g = 0; g <= gen; g++) {
-            std::vector<isolate*> *tmp_candidates = &(*migrantPool)[0][g];
+            std::vector<std::vector<isolate*> > *tmp_candidates = &(*migrantPool)[g];
             if (tmp_candidates->size() >= 1) {
                 migration_gen = g;
             }
