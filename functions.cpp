@@ -1998,16 +1998,14 @@ int printPop(char* prefixStar,std::string suffix,std::vector<isolate*> *currentI
     if (popOutFile.is_open()) {
 
         popOutFile << "Locus\tFrequency" << std::endl;
-        std::vector<double> currentFreq(accessoryLoci->size(),0.0);
+        std::vector<int> currentFreq(accessoryLoci->size(),0.0);
         std::vector<isolate*>::iterator iit;
         for (iit = currentIsolates->begin(), currentIsolates->end() ; iit != currentIsolates->end(); ++iit) {
-            for (unsigned int i = 0; i < (*iit)->genotype.size(); i++) {
-                currentFreq[i]+=double((*iit)->genotype[i])/pSize;
-            }
+            std::transform (currentFreq.begin(), currentFreq.end(), (*iit)->genotype.begin(), currentFreq.begin(), std::plus<int>());
         }
         
         for (unsigned int i = 0; i < accessoryLoci->size(); i++) {
-            popOutFile << (*accessoryLoci)[i]->id << "\t" << currentFreq[i] << std::endl;
+            popOutFile << (*accessoryLoci)[i]->id << "\t" << double(currentFreq[i])/currentIsolates->size() << std::endl;
         }
         
         popOutFile.close();
@@ -2021,16 +2019,14 @@ int printPop(char* prefixStar,std::string suffix,std::vector<isolate*> *currentI
         if (marOutFile.is_open()) {
 
             marOutFile << "Marker\tFrequency" << std::endl;
-            std::vector<double> currentFreq(markerList->size(),0.0);
+            std::vector<int> currentFreq(markerList->size(),0.0);
             std::vector<isolate*>::iterator iit;
             for (iit = currentIsolates->begin(), currentIsolates->end() ; iit != currentIsolates->end(); ++iit) {
-                for (unsigned int i = 0; i < (*iit)->markers.size(); i++) {
-                    currentFreq[i]+=double((*iit)->markers[i])/pSize;
-                }
+                std::transform (currentFreq.begin(), currentFreq.end(), (*iit)->markers.begin(), currentFreq.begin(), std::plus<int>());
             }
             
             for (unsigned int i = 0; i < markerList->size(); i++) {
-                marOutFile << (*markerList)[i] << "\t" << currentFreq[i] << std::endl;
+                marOutFile << (*markerList)[i] << "\t" << double(currentFreq[i])/currentIsolates->size() << std::endl;
             }
             
             marOutFile.close();
