@@ -61,6 +61,9 @@ int parseOrderingFile(char* orderingFilename,std::vector<cog*> *accessoryLoci,st
 // picking out valid strains for migration
 std::vector<int> getValidStrains(std::vector<std::vector<isolate*> > migrantInput);
 
+// overall population division function
+int generateMigrantPool(std::vector<std::vector<std::vector<isolate*> > > *migrantPool, std::vector<isolate*> *population, std::vector<isolate*> *migrant_population, char* migrantFilename, std::vector<int> *scList, int maxScNum, int minGen,struct parms *p);
+
 // diving population for immigration
 int dividePopulationForImmigration(std::vector<isolate*> *pop,std::vector<int> *scList,std::vector<std::vector<isolate*> > *popBySc,int maxScNum);
 
