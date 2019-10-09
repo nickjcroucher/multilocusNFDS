@@ -794,11 +794,13 @@ int generateMigrantPool(std::vector<std::vector<std::vector<isolate*> > > *migra
         }
     // Do not split, just sample at random
     } else {
+        std::vector<std::vector<isolate*> > *tmpStrains = new std::vector<std::vector<isolate*> >;
         if (migrantFilename != NULL) {
-            migrantPool[0][0].push_back(*migrant_population);
+            tmpStrains->push_back(*migrant_population);
         } else {
-            migrantPool[0][0].push_back(*population);
+            tmpStrains->push_back(*migrant_population);
         }
+        migrantPool->push_back(*tmpStrains);
     }
     
     return 0;
