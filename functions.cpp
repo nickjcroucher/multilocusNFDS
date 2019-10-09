@@ -1129,7 +1129,14 @@ int reproduction(std::vector<isolate*> *currentIsolates,std::vector<isolate*> *f
     // if mode == 2 immigration, chose the timestep
     // from which to select the migrants
     int migration_gen = 0;
-    if (sp->immigrationType == 2 || sp->immigrationType == 3) {
+    if (sp->immigrationType == 2) {
+        for (int g = 0; g <= gen; g++) {
+            std::vector<isolate*> *tmp_candidates = &(*migrantPool)[0][g];
+            if (tmp_candidates->size() >= 1) {
+                migration_gen = g;
+            }
+        }
+    } else if (sp->immigrationType == 3) {
         for (int g = 0; g <= gen; g++) {
             std::vector<std::vector<isolate*> > *tmp_candidates = &(*migrantPool)[g];
             if (tmp_candidates->size() >= 1) {
