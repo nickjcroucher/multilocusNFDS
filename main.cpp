@@ -195,8 +195,6 @@ int main(int argc, char * argv[]) {
     }
 
     int genLimit = p.numGen+minGen;
-//    int maxScNum = 1+(*std::max_element(std::begin(scList),std::end(scList)));
-    int maxScNum = 1+(*std::max_element(scList.begin(),scList.end()));
     
     // add marker information if a marker file is provided
     std::vector<std::string> markerList;
@@ -225,7 +223,16 @@ int main(int argc, char * argv[]) {
             usage(argv[0]);
             return 1;
         }
+        // update SC list
+        scList.insert(scList.end(),migrant_scList.begin(),migrant_scList.end());
+        sort(scList.begin(), scList.end());
+        std::vector<int>::iterator it;
+        it = std::unique (scList.begin(), scList.end());
+        scList.resize(std::distance(scList.begin(),it));
     }
+    
+    // get final max SC num
+    int maxScNum = 1+(*std::max_element(scList.begin(),scList.end()));
     
     // parse migrant marker file
     if (markerFilename != NULL) {
