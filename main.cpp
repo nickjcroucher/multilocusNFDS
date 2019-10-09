@@ -452,63 +452,13 @@ int main(int argc, char * argv[]) {
                     return 1;
                 }
                 
-                
-                // update migration pools
-                int migrationCheck = generateMigrantPool(migrantPool, population, migrant_population, migrantFilename, &scList, maxScNum, minGen, &p);
-                if (migrationCheck != 0) {
-                    std::cerr << "Unable to generate population for migration in generation " << gen << std::endl;
-                    usage(argv[0]);
-                    return 1;
-                }
-
-//                if (p.immigrationType == 1) {
-//                    // split population for immigration by SC
-//                    int divCheck = 1;
-//                    std::vector<std::vector<isolate*> > *populationBySc = new std::vector<std::vector<isolate*> >;
-//                    if (migrantFilename != NULL) {
-//                        divCheck = dividePopulationForImmigration(migrant_population,&scList,populationBySc,maxScNum);
-//                    } else {
-//                        divCheck = dividePopulationForImmigration(population,&scList,populationBySc,maxScNum);
-//                    }
-//                    if (divCheck != 0) {
-//                        std::cerr << "Unable to split population into sequence clusters" << std::endl;
-//                        usage(argv[0]);
-//                        return 1;
-//                    }
-//                    migrantPool = NULL; // better way of freeing up memory?
-//                    migrantPool->push_back(*populationBySc);
-//                } else if (p.immigrationType == 2) {
-//                    // split population for immigration by time
-//                    int divCheck = 1;
-//                    std::vector<std::vector<isolate*> > *populationByTime = new std::vector<std::vector<isolate*> >;
-//                    if (migrantFilename != NULL) {
-//                        divCheck = dividePopulationForImmigrationByTime(migrant_population,minGen,p.numGen,populationByTime);
-//                    } else {
-//                        divCheck = dividePopulationForImmigrationByTime(population,minGen,p.numGen,populationByTime);
-//                    }
-//                    if (divCheck != 0) {
-//                        std::cerr << "Unable to split population by isolation times" << std::endl;
-//                        usage(argv[0]);
-//                        return 1;
-//                    }
-//                    migrantPool = NULL;
-//                    migrantPool->push_back(*populationByTime);
-//                } else {
-//                    if (migrantFilename != NULL) {
-//                        migrantPool[0][0].clear();
-//                        migrantPool[0][0].push_back(*migrant_population);
-//                    } else {
-//                        migrantPool[0][0].clear();
-//                        migrantPool[0][0].push_back(*population);
-//
-//                    }
-//                }
-                
+                // use the new population to update the set of isolates used to generate the migrant pools
+                // this is either the original population, or the migrant_population
                 int nextPopulationCheck = 1;
                 if (migrantFilename != NULL) {
                     nextPopulationCheck = nextGeneration(migrant_population,new_population,currentIsolates,futureIsolates);
-//                } else {
-//                    nextPopulationCheck = nextGeneration(population,new_population,currentIsolates,futureIsolates);
+                } else {
+                    nextPopulationCheck = nextGeneration(population,new_population,currentIsolates,futureIsolates);
                 }
                 if (nextPopulationCheck != 0) {
                     std::cerr << "Cannot store set of population recombinant isolates" << std::endl;
@@ -516,9 +466,19 @@ int main(int argc, char * argv[]) {
                     return 1;
                 }
                 
+                // update migration pools using the updated population/migrant population vectors
+                int migrationCheck = generateMigrantPool(migrantPool, population, migrant_population, migrantFilename, &scList, maxScNum, minGen, &p);
+                if (migrationCheck != 0) {
+                    std::cerr << "Unable to generate population for migration in generation " << gen << std::endl;
+                    usage(argv[0]);
+                    return 1;
+                }
+                
             }
             
             // move on to next generation, with updated population
+            // use nextGeneration, rather than update population, to free memory in case of
+            // obsolete genotypes
             int nextGenerationCheck = nextGeneration(population,new_population,currentIsolates,futureIsolates);
             if (nextGenerationCheck != 0) {
                 std::cerr << "Cannot store set of extant recombinant isolates" << std::endl;
@@ -534,7 +494,6 @@ int main(int argc, char * argv[]) {
             usage(argv[0]);
             return 1;
         }
-
         
         // move on to next generation
         int updatePopulationCheck = updatePopulation(currentIsolates,futureIsolates);

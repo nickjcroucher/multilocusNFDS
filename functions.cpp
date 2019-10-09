@@ -1450,7 +1450,7 @@ int nextGeneration(std::vector<isolate*> *pop,std::vector<isolate*> *new_pop,std
     futureIsolates->shrink_to_fit();
     
     // replace old population with new population
-    // if old population not in extanded population
+    // if old population not in extant population
     // or new migrant pool, then dropped from simulation
     pop->clear();
     pop->shrink_to_fit();
