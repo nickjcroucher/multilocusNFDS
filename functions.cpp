@@ -997,7 +997,7 @@ int reproduction(std::vector<isolate*> *currentIsolates,std::vector<isolate*> *f
     double oldFitness = 0.0;
     int debug = 0;
     for (iter = currentIsolates->begin(), currentIsolates->end(); iter != currentIsolates->end(); ++iter) {
-        debug++;
+        
         // calculate fitness of each new genotype in population
         if ((*iter)->id != oldId) {
             
@@ -1021,6 +1021,7 @@ int reproduction(std::vector<isolate*> *currentIsolates,std::vector<isolate*> *f
         }
         // select offspring by Poisson distribution
         int progeny = gsl_ran_poisson(rgen,oldFitness);
+        debug++;
         for (int p = 0; p < progeny; p++) {
             futureIsolates->push_back((*iter));
             // record statistics
@@ -1038,6 +1039,7 @@ int reproduction(std::vector<isolate*> *currentIsolates,std::vector<isolate*> *f
             }
         }
     }
+    std::cerr << "Number of Poissons! " << debug << std::endl;
     
     // allow for immigration
     double adjustedImmigrationRate = (sp->immigrationRate)*(double(sp->popSize)/double(currentIsolates->size()));
@@ -1046,7 +1048,7 @@ int reproduction(std::vector<isolate*> *currentIsolates,std::vector<isolate*> *f
     // if mode == 2 immigration, chose the timestep
     // from which to select the migrants
     int migration_gen = 0;
-    if (sp->immigrationType == 2 && sp->immigrationType == 3) {
+    if (sp->immigrationType == 2 || sp->immigrationType == 3) {
         for (int g = 0; g <= gen; g++) {
             std::vector<isolate*> *tmp_candidates = &(*migrantPool)[0][g];
             if (tmp_candidates->size() >= 1) {
@@ -1225,18 +1227,21 @@ int recombination(std::vector<isolate*> *currentIsolates,std::vector<isolate*> *
     std::vector<isolate*> *isolate_array = currentIsolates;
     
     for (iit = isolate_array->begin(), isolate_array->end() ; iit != isolate_array->end(); ++iit) {
-        isolate recipient = *(*iit);
         bool recHappened = false;
         // test if recombination occurs in this isolate at this timestep
-        double rTrans = double(gsl_rng_uniform(rgen));
+        double rTrans = gsl_rng_uniform(rgen);
         if (rTrans <= transformationRate) {
+            // find recipient if recombination happened
+            isolate recipient = *(*iit);
+            // select the donor isolate
+            int j = int(gsl_rng_uniform(rgen) * isolate_array->size());
+            isolate donor = *(*isolate_array)[j];
             // if so, how much of the genome is replaced
             for (unsigned int i = 0; i < recipient.genotype.size(); i++) {
                 // recombination at selected loci
-                double pTrans = double(gsl_rng_uniform(rgen));
+                double pTrans = gsl_rng_uniform(rgen);
                 if (pTrans <= transformationProportion) {
-                    int j = int(gsl_rng_uniform(rgen) * isolate_array->size());
-                    bool donorAllele = (*isolate_array)[j]->genotype[i];
+                    bool donorAllele = donor.genotype[i];
                     bool recipientAllele = recipient.genotype[i];
                     recipient.genotype[i] = alleleExchange(recipientAllele,donorAllele,transformationAsymmetryLoci);
                     if (recipient.genotype[i] != recipientAllele) {
@@ -1248,11 +1253,9 @@ int recombination(std::vector<isolate*> *currentIsolates,std::vector<isolate*> *
             // recombination at unselected markers
             if (markerFilename != NULL) {
                 for (unsigned int i = 0; i < recipient.markers.size(); i++) {
-                    double mTrans = double(gsl_rng_uniform(rgen));
-                    if (mTrans <= transformationRate) {
-                        recHappened = true;
-                        int j = int(gsl_rng_uniform(rgen) * isolate_array->size());
-                        bool donorAllele = (*isolate_array)[j]->markers[i];
+                    double mTrans = gsl_rng_uniform(rgen);
+                    if (mTrans <= transformationProportion) {
+                        bool donorAllele = donor.markers[i];
                         bool recipientAllele = recipient.markers[i];
                         recipient.markers[i] = alleleExchange(recipientAllele,donorAllele,transformationAsymmetryMarker);
                         if (recipient.markers[i] != recipientAllele) {
@@ -1267,15 +1270,12 @@ int recombination(std::vector<isolate*> *currentIsolates,std::vector<isolate*> *
                 std::vector<std::string> seglist;
                 seglist = explode(recipient.id,'_');
                 
-                // generate new hexadecimal suffix
-                std::string newSuffix = generateRandomString(7);
-                
-                // assign new ID
-                recipient.id = seglist[0]+"_"+newSuffix;
+                // assign ID with new hexadecimal suffix
+                std::string new_id = seglist[0]+"_"+generateRandomString(7);
                 
                 // store in new population
                 
-                isolate* tmp = new isolate(recipient.id,recipient.year,recipient.sc,recipient.serotype,recipient.vt,recipient.latent_vt,&recipient.genotype,&recipient.markers);
+                isolate* tmp = new isolate(new_id,recipient.year,recipient.sc,recipient.serotype,recipient.vt,recipient.latent_vt,&recipient.genotype,&recipient.markers);
                 futureIsolates->push_back(tmp);
                 
             } else {
@@ -1405,7 +1405,7 @@ int nextGeneration(std::vector<isolate*> *pop,std::vector<isolate*> *new_pop,std
 // Compare simulation and genomic samples //
 ////////////////////////////////////////////
 
-int compareSamples(int gen,int minGen,int sampleSize,std::vector<isolate*> *currentIsolates,std::vector<isolate*> *pop,std::vector<cog*> *accessoryLoci,std::vector<int> &scList,std::vector< std::vector<double> > &sampledVtScFreq,std::vector< std::vector<double> > &sampledNvtScFreq,std::vector<int> &sampledSeroFreq,std::vector<std::string> &serotypeList,std::vector<double> &vtCogFittingStatsList,std::vector<double> &nvtCogFittingStatsList,std::vector<double> &strainFittingStatsList,std::ofstream& sampleOutFile) {
+int compareSamples(int gen,int minGen,int sampleSize,std::vector<isolate*> *currentIsolates,std::vector<isolate*> *pop,std::vector<cog*> *accessoryLoci,std::vector<int> &scList,std::vector< std::vector<double> > &sampledVtScFreq,std::vector< std::vector<double> > &sampledNvtScFreq,std::vector<int> &sampledSeroFreq,std::vector<std::string> &serotypeList,std::vector<double> &vtCogFittingStatsList,std::vector<double> &nvtCogFittingStatsList,std::vector<double> &strainFittingStatsList,std::ofstream& sampleOutFile,struct parms *sp) {
     
     // data structures for sample
     std::vector<isolate*> isolateSample;
@@ -1556,8 +1556,12 @@ int compareSamples(int gen,int minGen,int sampleSize,std::vector<isolate*> *curr
     }
     
     // calculate correlations - absolute, not squared, value
-    double simulationNvtCorrelation = pearson(&currentSampleNvtFreq,&startingSampleNvtFreq);
-    double genomicNvtCorrelation = pearson(&currentGenomicNvtFreq,&startingGenomicNvtFreq);
+    double simulationNvtCorrelation = 0.0;
+    double genomicNvtCorrelation = 0.0;
+    if (sp->programme == "x") {
+        double simulationNvtCorrelation = pearson(&currentSampleNvtFreq,&startingSampleNvtFreq);
+        double genomicNvtCorrelation = pearson(&currentGenomicNvtFreq,&startingGenomicNvtFreq);
+    }
 //    double nvtCogStat = std::abs((simulationNvtCorrelation-genomicNvtCorrelation)/(1-genomicNvtCorrelation));
     double nvtCogStat = std::abs(simulationNvtCorrelation-genomicNvtCorrelation);
     
@@ -1978,8 +1982,6 @@ int printOutput(char* outputFilename,std::vector<std::string> *seroList,std::vec
 
 int printPop(char* prefixStar,std::string suffix,std::vector<isolate*> *currentIsolates,char* markerFilename,std::vector<cog*> *accessoryLoci,std::vector<std::string> *markerList) {
     
-    // population size
-    double pSize = double(currentIsolates->size());
     // parse file names
     std::stringstream prefixStream;
     std::string prefix(prefixStar);

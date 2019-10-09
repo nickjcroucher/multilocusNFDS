@@ -316,10 +316,8 @@ int main(int argc, char * argv[]) {
         // then split each time point by strain
         std::vector<std::vector<isolate*> > *populationByTimeAndSc = new std::vector<std::vector<isolate*> >;
         for (int g = 0; g <= p.numGen; g++) {
-            divCheck = 1;
             if ((*populationByTime)[g].size() >= 1) {
                 std::vector<isolate*> *tmpStrains = new std::vector<isolate*>;
-//                tmpStrains = &populationByTime[g][g]; // needs fixing
                 tmpStrains = &(*populationByTime)[g]; // needs fixing                
                 divCheck = dividePopulationForImmigration(tmpStrains,&scList,populationByTimeAndSc,maxScNum);
                 if (divCheck != 0) {
@@ -328,28 +326,9 @@ int main(int argc, char * argv[]) {
                     return 1;
                 } else {
                     migrantPool->push_back(*populationByTimeAndSc);
-                    
-                    
-//                    int timeAndScSize = populationByTimeAndSc->size(); // might need fixing - mainly just casting
-//                    std::cerr << "timeAndScSize: " << timeAndScSize << std::endl;
-//                    for (int l = 0; l <= timeAndScSize; l++) {
-//                        std::vector<isolate*> *tmpInput = new std::vector<isolate*>;
-//                        tmpInput = &populationByTimeAndSc[l][0]; // needs fixing
-//                        migrantPool[g].push_back(*tmpInput);
-//                        std::cerr << "l: " << l << " migrant times: " << migrant_times.size() << std::endl;
-////                        migrantPool[l+migrantPool->size()].push_back(*migrant_population);
-////                        migrant_times[g].push_back(migrantPool->size());
-//                        std::cerr << "l2: " << l << std::endl;
-//                        std::cerr << "l is " << l << " and size is " << migrantPool->size() << std::endl;
-                    
-                        
-                        
-//                    }
                 }
             }
         }
-//        migrantPool = populationByTime;
-
     } else {
         if (migrantFilename != NULL) {
             migrantPool[0][0].push_back(*migrant_population);
@@ -529,7 +508,7 @@ int main(int argc, char * argv[]) {
             }
 
             if (migrantEvolution) {
-            
+                
                 // recombination among population of migration candidates
                 int populationTransformationCheck = 1;
                 if (migrantFilename != NULL) {
@@ -593,8 +572,8 @@ int main(int argc, char * argv[]) {
                 int nextPopulationCheck = 1;
                 if (migrantFilename != NULL) {
                     nextPopulationCheck = nextGeneration(migrant_population,new_population,currentIsolates,futureIsolates);
-                } else {
-                    nextPopulationCheck = nextGeneration(population,new_population,currentIsolates,futureIsolates);
+//                } else {
+//                    nextPopulationCheck = nextGeneration(population,new_population,currentIsolates,futureIsolates);
                 }
                 if (nextPopulationCheck != 0) {
                     std::cerr << "Cannot store set of population recombinant isolates" << std::endl;
@@ -613,12 +592,13 @@ int main(int argc, char * argv[]) {
 //            }
             
             // move on to next generation, with updated population
+            int nextGenerationCheck = nextGeneration(population,new_population,currentIsolates,futureIsolates);
 //            int nextGenerationCheck = nextGeneration(currentIsolates,futureIsolates,population);
-//            if (nextGenerationCheck != 0) {
-//                std::cerr << "Cannot store set of extant recombinant isolates" << std::endl;
-//                usage(argv[0]);
-//                return 1;
-//            }
+            if (nextGenerationCheck != 0) {
+                std::cerr << "Cannot store set of extant recombinant isolates" << std::endl;
+                usage(argv[0]);
+                return 1;
+            }
         }
         
         // allow cells to reproduce and update COG deviations array
@@ -641,7 +621,7 @@ int main(int argc, char * argv[]) {
         // compare to genomes
         unsigned int gen_diff = gen-minGen;
         if (gen_diff < samplingList->size() && (*samplingList)[gen_diff] > 0 && p.programme != "s" && p.programme != "x") {
-            int compareSamplesCheck = compareSamples(gen,minGen,(*samplingList)[gen-minGen],currentIsolates,population,accessoryLoci,scList,sampledVtScFreq,sampledNvtScFreq,sampledSeroFreq[gen-minGen],serotypeList,vtCogFittingStatsList,nvtCogFittingStatsList,strainFittingStatsList,sampleOutFile);
+            int compareSamplesCheck = compareSamples(gen,minGen,(*samplingList)[gen-minGen],currentIsolates,population,accessoryLoci,scList,sampledVtScFreq,sampledNvtScFreq,sampledSeroFreq[gen-minGen],serotypeList,vtCogFittingStatsList,nvtCogFittingStatsList,strainFittingStatsList,sampleOutFile,&p);
             if (compareSamplesCheck != 0) {
                 std::cerr << "Unable to compare simulated and actual frequencies" << std::endl;
                 usage(argv[0]);
