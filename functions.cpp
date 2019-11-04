@@ -1077,7 +1077,7 @@ int reproduction(std::vector<isolate*> *currentIsolates,std::vector<isolate*> *f
     // allow old generation to reproduce
     std::string oldId = "";
     double oldFitness = 0.0;
-    int debug = 0;
+    
     for (iter = currentIsolates->begin(), currentIsolates->end(); iter != currentIsolates->end(); ++iter) {
         
         // calculate fitness of each new genotype in population
@@ -1103,7 +1103,6 @@ int reproduction(std::vector<isolate*> *currentIsolates,std::vector<isolate*> *f
         }
         // select offspring by Poisson distribution
         int progeny = gsl_ran_poisson(rgen,oldFitness);
-        debug++;
         for (int p = 0; p < progeny; p++) {
             futureIsolates->push_back((*iter));
             // record statistics
@@ -1408,7 +1407,7 @@ int updatePopulation(std::vector<isolate*> *pop,std::vector<isolate*> *new_pop) 
     
 }
 
-int nextGeneration(std::vector<isolate*> *pop,std::vector<isolate*> *new_pop,std::vector<isolate*> *currentIsolates,std::vector<isolate*> *futureIsolates) {
+int nextGeneration(std::vector<isolate*> *pop,std::vector<isolate*> *new_pop,std::vector<isolate*> *currentIsolates,std::vector<isolate*> *futureIsolates, std::vector<std::vector<std::vector<isolate*> > > *migrantPool) {
     
     // list of objects to delete
     std::vector<isolate*> *to_delete = new std::vector<isolate*>;
@@ -1422,7 +1421,19 @@ int nextGeneration(std::vector<isolate*> *pop,std::vector<isolate*> *new_pop,std
     for (iit = currentIsolates->begin(), currentIsolates->end() ; iit != currentIsolates->end(); ++iit) {
         if (!(std::find(futureIsolates->begin(), futureIsolates->end(),(*iit))!=futureIsolates->end())) {
             if (!(std::find(new_pop->begin(), new_pop->end(), (*iit))!=new_pop->end())) {
-                to_delete->push_back(*iit);
+                bool found = false;
+                for (int a = 0; a < migrantPool->size(); a++) {
+                    for (int b = 0; b < migrantPool[a].size(); b++) {
+                        for (int c = 0; c < migrantPool[a][b].size(); c++) {
+                            if (std::find(migrantPool[a][b][c].begin(), migrantPool[a][b][c].end(), (*iit))!=migrantPool[a][b][c].end()) {
+                                found = true;
+                            }
+                        }
+                    }
+                }
+                if (!(found)) {
+                    to_delete->push_back(*iit);
+                }
             }
         }
     }

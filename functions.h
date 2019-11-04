@@ -99,7 +99,7 @@ int recombination(std::vector<isolate*> *currentIsolates,std::vector<isolate*> *
 int update_locus_freq(std::vector<isolate*> *futureIsolates, std::vector<double> *cogWeights, std::vector<double> *cogDeviations, std::vector<double> *ef);
 
 // move isolate into next generation
-int nextGeneration(std::vector<isolate*> *pop,std::vector<isolate*> *new_pop,std::vector<isolate*> *currentIsolates,std::vector<isolate*> *futureIsolates);
+int nextGeneration(std::vector<isolate*> *pop,std::vector<isolate*> *new_pop,std::vector<isolate*> *currentIsolates,std::vector<isolate*> *futureIsolates, std::vector<std::vector<std::vector<isolate*> > > *migrantPool);
 
 // update population
 int updatePopulation(std::vector<isolate*> *pop,std::vector<isolate*> *new_pop);

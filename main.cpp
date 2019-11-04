@@ -444,7 +444,7 @@ int main(int argc, char * argv[]) {
                 std::cerr << "Extant isolates unable to undergo recombination" << std::endl;
                 return 1;
             }
-
+            
             if (migrantEvolution) {
                 
                 // recombination among population of migration candidates
@@ -463,9 +463,9 @@ int main(int argc, char * argv[]) {
                 // this is either the original population, or the migrant_population
                 int nextPopulationCheck = 1;
                 if (migrantFilename != NULL) {
-                    nextPopulationCheck = nextGeneration(migrant_population,new_population,currentIsolates,futureIsolates);
+                    nextPopulationCheck = nextGeneration(migrant_population,new_population,currentIsolates,futureIsolates,migrantPool);
                 } else {
-                    nextPopulationCheck = nextGeneration(population,new_population,currentIsolates,futureIsolates);
+                    nextPopulationCheck = nextGeneration(population,new_population,currentIsolates,futureIsolates,migrantPool);
                 }
                 if (nextPopulationCheck != 0) {
                     std::cerr << "Cannot store set of population recombinant isolates" << std::endl;
@@ -486,7 +486,7 @@ int main(int argc, char * argv[]) {
             // move on to next generation, with updated population
             // use nextGeneration, rather than update population, to free memory in case of
             // obsolete genotypes
-            int nextGenerationCheck = nextGeneration(population,new_population,currentIsolates,futureIsolates);
+            int nextGenerationCheck = nextGeneration(population,new_population,currentIsolates,futureIsolates,migrantPool);
             if (nextGenerationCheck != 0) {
                 std::cerr << "Cannot store set of extant recombinant isolates" << std::endl;
                 usage(argv[0]);
