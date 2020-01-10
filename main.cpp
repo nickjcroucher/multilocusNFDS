@@ -63,13 +63,14 @@ int main(int argc, char * argv[]) {
     char* migrantMarkerFilename = NULL;
     int secondVaccinationGeneration = -100;
     bool migrantEvolution = 0;
+    bool zeroTimeSelection = 0;
     
     if (argc == 1) {
         usage(argv[0]);
         return 1;
     } else {
         int opt = 0;
-        while ((opt = getopt(argc,argv,"Ehc:p:s:v:i:t:n:g:u:l:y:j:k:f:x:w:r:o:m:z:e:a:b:d:q:1:2:")) != EOF) {
+        while ((opt = getopt(argc,argv,"Ehc:p:s:v:i:t:n:g:u:l:y:j:k:f:x:w:r:o:m:z:e:a:b:d:q:1:2:0")) != EOF) {
             switch (opt) {
                 case 'h':
                     usage(argv[0]);
@@ -162,6 +163,9 @@ int main(int argc, char * argv[]) {
                     break;
                 case 'q':
                     secondVaccinationGeneration = atoi(optarg);
+                    break;
+                case '0':
+                    zeroTimeSelection = 1;
                     break;
             }
         }
@@ -492,6 +496,21 @@ int main(int argc, char * argv[]) {
                 usage(argv[0]);
                 return 1;
             }
+            
+            // if requested, immediately update COG deviations following recombination
+            if (zeroTimeSelection) {
+                
+                std::cerr << cogDeviations[0] << std::endl;
+                int freq_update_check = update_locus_freq(currentIsolates,&cogWeights,&cogDeviations,&eqFreq);
+                std::cerr << cogDeviations[0] << std::endl;
+                
+                if (freq_update_check != 0) {
+                    std::cerr << "Cannot update locus frequencies following recombination" << std::endl;
+                    usage(argv[0]);
+                    return 1;
+                }
+            }
+            
         }
         
         // allow cells to reproduce and update COG deviations array
