@@ -499,11 +499,7 @@ int main(int argc, char * argv[]) {
             
             // if requested, immediately update COG deviations following recombination
             if (zeroTimeSelection) {
-                
-                std::cerr << cogDeviations[0] << std::endl;
                 int freq_update_check = update_locus_freq(currentIsolates,&cogWeights,&cogDeviations,&eqFreq);
-                std::cerr << cogDeviations[0] << std::endl;
-                
                 if (freq_update_check != 0) {
                     std::cerr << "Cannot update locus frequencies following recombination" << std::endl;
                     usage(argv[0]);
