@@ -350,6 +350,10 @@ int main(int argc, char * argv[]) {
 
     // 2D vectors for recording cog deviations
     std::vector<std::vector<double> > piGen;
+    std::vector<double> timeGen;
+    std::vector<double> fitGen;
+    std::vector<std::string> isolateGen;
+    std::vector<int> countGen;
     if (p.programme == "x") {
         piGen.resize(p.numGen+1,std::vector<double>(accessoryLoci->size(),0.0));
     } else {
@@ -510,7 +514,7 @@ int main(int argc, char * argv[]) {
         }
         
         // allow cells to reproduce and update COG deviations array
-        int reproCheck = reproduction(currentIsolates,futureIsolates,migrantPool,&cogWeights,&cogDeviations,&p,&eqFreq,&vtScFreq[gen-minGen],&nvtScFreq[gen-minGen],&piGen[gen-minGen],&scList,gen);
+        int reproCheck = reproduction(currentIsolates,futureIsolates,migrantPool,&cogWeights,&cogDeviations,&p,&eqFreq,&vtScFreq[gen-minGen],&nvtScFreq[gen-minGen],&piGen[gen-minGen],&scList,gen,&timeGen,&fitGen,&isolateGen,&countGen);
         if (reproCheck != 0) {
             std::cerr << "Population failed to reproduce at generation " << gen << std::endl;
             usage(argv[0]);
@@ -587,7 +591,7 @@ int main(int argc, char * argv[]) {
     
     // print output files if simulating
     if (p.programme != "f") {
-        int printCheck = printOutput(outputFilename,&serotypeList,sampledSeroFreq,&scList,vtScFreq,nvtScFreq,p.numGen,minGen,accessoryLoci,samplingList,piGen,&p);
+        int printCheck = printOutput(outputFilename,&serotypeList,sampledSeroFreq,&scList,vtScFreq,nvtScFreq,p.numGen,minGen,accessoryLoci,samplingList,piGen,&p,&timeGen,&fitGen,&isolateGen,&countGen);
         if (printCheck != 0) {
             std::cerr << "Could not write to output files" << std::endl;
             usage(argv[0]);

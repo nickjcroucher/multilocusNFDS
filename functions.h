@@ -90,7 +90,7 @@ int alterVaccineFormulation(std::vector<isolate*> *currentIsolates,std::vector<i
 //////////////////////////////
 
 // select next generation
-int reproduction(std::vector<isolate*> *currentIsolates,std::vector<isolate*> *futureIsolates,std::vector<std::vector<std::vector<isolate*> > > *migrantPool,std::vector<double> *cogWeights,std::vector<double> *cogDeviations,struct parms *sp, std::vector<double> * ef, std::vector<int> * vtScFreq,std::vector<int> * nvtScFreq,std::vector<double> * piGen,std::vector<int> *scList, int gen);
+int reproduction(std::vector<isolate*> *currentIsolates,std::vector<isolate*> *futureIsolates,std::vector<std::vector<std::vector<isolate*> > > *migrantPool,std::vector<double> *cogWeights,std::vector<double> *cogDeviations,struct parms *sp, std::vector<double> * ef, std::vector<int> * vtScFreq,std::vector<int> * nvtScFreq,std::vector<double> * piGen,std::vector<int> *scList, int gen,std::vector<double> * timeGen,std::vector<double> * fitGen,std::vector<std::string> * isolateGen,std::vector<int> * countGen);
 
 // recombination
 int recombination(std::vector<isolate*> *currentIsolates,std::vector<isolate*> *futureIsolates,char* markerFilename,double transformationProportion,double transformationRate,double transformationAsymmetryLoci, double transformationAsymmetryMarker);
@@ -121,7 +121,7 @@ double pearson(std::vector<double> *x,std::vector<double> *y);
 int rFitMetricCalculation(int minGen,std::vector<int> *samplingList,std::vector<int> &scList,std::vector< std::vector<double> > &sampledVtScFreq,std::vector< std::vector<double> > &sampledNvtScFreq,std::vector<isolate*> *population,std::vector<double> &rFitVector);
 
 // print output
-int printOutput(char* outputFilename,std::vector<std::string> *seroList,std::vector<std::vector<int> > &sampledSeroFreq,std::vector<int> *scList,std::vector<std::vector<int> > &vtScFreq,std::vector<std::vector<int> > &nvtScFreq,int gen,int minGen,std::vector<cog*> *accessoryLoci,std::vector<int> *samplingList,std::vector<std::vector<double> > &piGen,struct parms *sp);
+int printOutput(char* outputFilename,std::vector<std::string> *seroList,std::vector<std::vector<int> > &sampledSeroFreq,std::vector<int> *scList,std::vector<std::vector<int> > &vtScFreq,std::vector<std::vector<int> > &nvtScFreq,int gen,int minGen,std::vector<cog*> *accessoryLoci,std::vector<int> *samplingList,std::vector<std::vector<double> > &piGen,struct parms *sp,std::vector<double> * timeGen,std::vector<double> * fitGen,std::vector<std::string> * isolateGen,std::vector<int> * countGen);
 
 // print populations
 int printPop(char* outputFilename,std::string suffix,std::vector<isolate*> *currentIsolates, char *markerFilename, std::vector<cog*> *accessoryLoci,std::vector<std::string> *markerList);
