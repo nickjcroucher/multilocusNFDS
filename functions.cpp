@@ -1085,7 +1085,7 @@ int reproduction(std::vector<isolate*> *currentIsolates,std::vector<isolate*> *f
         if ((*iter)->id != oldId) {
             
             // record isolate fitnesses for extended output
-            if (sp->programme == "x") {
+            if (sp->programme == "x" && oldFitness != 0.0) {
                 isolateGen->push_back((*iter)->id);
                 fitGen->push_back(oldFitness);
                 timeGen->push_back(gen);
