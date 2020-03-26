@@ -180,7 +180,7 @@ int parseInputFile(std::vector<isolate*> *pop, std::vector<cog*> *accessoryLoci,
         samplingList->resize(maxTime+1,0);
         for (iter = samplingTimes.begin(), samplingTimes.end() ; iter != samplingTimes.end(); ++iter) {
 //            std::cerr << "Iter: " << (*iter) << " ref: " << (*iter)-minGen << " altering: " << (*samplingList) << std::endl;
-            (*samplingList)[(*iter)-minGen] = 1;
+            (*samplingList)[(*iter)-minGen]++;
         }
 
         // create vector of accessory locus COG objects
