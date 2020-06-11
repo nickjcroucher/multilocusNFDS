@@ -1030,17 +1030,62 @@ saltational_no_mig_plots<-process_simulation_data(prefixes=saltational_prefixes_
 
 # save figures
 format_plots(saltational_no_mig_plots,"multistrain_with_saltational_trans_without_migration_")
-# 
-# # saltational recombination - with migration
-# saltational_prefixes_with_mig<-c("~/Documents/evoMLNFDS/rec_v_select/zero_time/saltational_rec_v_select_mig/saltational_rec_v_select_mig",
-#                                "~/Documents/evoMLNFDS/rec_v_select/zero_time/saltational_rec_v_no_select_mig/saltational_rec_v_no_select_mig",
-#                                "~/Documents/evoMLNFDS/rec_v_select/zero_time/no_rec_v_select_mig/no_rec_v_select_mig",
-#                                "~/Documents/evoMLNFDS/rec_v_select/zero_time/no_rec_v_no_select_mig/no_rec_v_no_select_mig",
-#                                "~/Documents/evoMLNFDS/rec_v_select/zero_time/saltational_sym_rec_v_select_mig/saltational_sym_rec_v_select_mig",
-#                                "~/Documents/evoMLNFDS/rec_v_select/zero_time/saltational_sym_rec_v_no_select_mig/saltational_sym_rec_v_no_select_mig"
-# )
-# 
-# saltational_with_mig_plots<-process_simulation_data(prefixes=saltational_prefixes_with_mig,recs=recs,selects=selects,summaries=summaries,eq.loci=eq.loci,real.data=ma.data,snp.loci=snp.loci,snp.calc=TRUE,strain_slope=strain_divide_slope,strain_intercept=strain_divide_intercept,tip.anno=ma.tip.labels,real_strains=ma.strain.freqs)
-# 
-# # save figures
-# format_plots(saltational_with_mig_plots,"multistrain_with_saltational_trans_with_migration_")
+
+######################################
+# Run permutation tests on distances #
+######################################
+
+# constrain rows
+limit_size.acc.data<-vegan::permatfull(acc.data,
+                                       mtype="prab",
+                                      fixedmar="row",
+                                      times = 100)
+# constrain columns
+limit_freq.acc.data<-vegan::permatfull(acc.data,
+                                       mtype="prab",
+                                       fixedmar="columns",
+                                       times = 100)
+# constrain rows and columns
+limit_freq_and_size.acc.data<-vegan::permatfull(acc.data,
+                                                mtype="prab",
+                                                fixedmar="both",
+                                                times = 100)
+
+# combine data
+permuted_distances.df<-bind_rows(
+  data.frame(
+    "Constraint" = "Fixed genome size",
+    "Distance" = unlist(lapply(limit_size.acc.data$perm,rdist,metric="jaccard"))
+  ),
+  data.frame(
+    "Constraint" = "Fixed gene frequecies",
+    "Distance" = unlist(lapply(limit_freq.acc.data$perm,rdist,metric="jaccard"))
+  ),
+  data.frame(
+    "Constraint" = "Fixed genome size and genome frequencies",
+    "Distance" = unlist(lapply(limit_freq_and_size.acc.data$perm,rdist,metric="jaccard"))
+  )
+)
+
+# plot comparison
+permutated_distances_plot<-ggplot(permuted_distances.df,aes(x=Distance)) +
+  geom_density(aes(y=..ndensity..),fill=my_fill_col,alpha=0.5,linetype=0) +
+  theme_minimal() +
+  xlab("Pairwise binary Jaccard distances between genomes")+
+  ylab("Density (log(density+1) scale)")+
+  facet_grid(Constraint ~ .) +
+  geom_density(data=genome_distances, aes(x=Distances, y=..scaled..), col = my_line_col, trim=TRUE)+
+  scale_y_continuous(trans="log1p") +
+  theme(#plot.margin = unit(c(0,0,0,0), "cm"),
+        panel.spacing = unit(0, "cm"),
+        legend.position="none",
+        panel.border = element_rect(color = "black", fill = NA, size = 0.25),
+        axis.text.y = element_text(size = 8),
+        axis.text.x = element_text(angle = 90, hjust = 1),
+        axis.title.x = element_text(size = 10, face = "bold"),
+        axis.title.y = element_text(size = 10, face = "bold"),
+        strip.text.x = element_text(size = my_facet_label_size),
+        strip.text.y = element_text(size = my_facet_label_size)
+  )
+
+ggsave(permutated_distances_plot,file=paste0("~/Documents/evoMLNFDS/rec_v_select/zero_time/figures/distance_permutations_plot.png"),width = 15,height = 25, units="cm")
