@@ -172,14 +172,13 @@ int parseInputFile(std::vector<isolate*> *pop, std::vector<cog*> *accessoryLoci,
         int maxTime = 0;
         std::vector<int>::iterator iter;
         for (iter = samplingTimes.begin(), samplingTimes.end() ; iter != samplingTimes.end(); ++iter) {
-            if ((*iter) > maxTime) {
-                maxTime = (*iter);
+            if ((*iter)-minGen > maxTime) {
+                maxTime = (*iter)-minGen;
             }
         }
         
         samplingList->resize(maxTime+1,0);
         for (iter = samplingTimes.begin(), samplingTimes.end() ; iter != samplingTimes.end(); ++iter) {
-//            std::cerr << "Iter: " << (*iter) << " ref: " << (*iter)-minGen << " altering: " << (*samplingList) << std::endl;
             (*samplingList)[(*iter)-minGen]++;
         }
 
@@ -1775,7 +1774,7 @@ int rFitMetricCalculation(int minGen,std::vector<int> *samplingList,std::vector<
                 genomicNvtObservations[genIndex].push_back((*iiter)->sc);
             }
         } else {
-            std::cerr << "Misalignment between sampling generations!" << std::endl;
+            std::cerr << "Misalignment between sampling generations at year " << (*iiter)->year << " with min gen " << minGen << std::endl;
             return 1;
         }
     }
@@ -1792,10 +1791,10 @@ int rFitMetricCalculation(int minGen,std::vector<int> *samplingList,std::vector<
     
     // count number of timepoints at which samples are taken
     // for calculating mean frequencies
-    double numberOfSamples = 0.0;
+    int numberOfSamples = 0;
     for (unsigned int i = 0; i < samplingList->size(); ++i) {
         if ((*samplingList)[i] > 0) {
-            numberOfSamples+=1.0;
+            numberOfSamples+=1;
         }
     }
     
@@ -1873,7 +1872,7 @@ int rFitMetricCalculation(int minGen,std::vector<int> *samplingList,std::vector<
             double simRmetric = tmp_t/tmp_c;
             
             // summarise difference between metric estimates weighted by SC frequency in actual data
-            RmetricDeviation+=((cumulativeFrequency/numberOfSamples)*fabs(realRmetric-simRmetric));
+            RmetricDeviation+=((cumulativeFrequency/double(numberOfSamples))*fabs(realRmetric-simRmetric));
 
         }
         // calculate metric comparison if >1 timepoint for NVT
@@ -1910,7 +1909,7 @@ int rFitMetricCalculation(int minGen,std::vector<int> *samplingList,std::vector<
             double simRmetric = tmp_t/tmp_c;
             
             // summarise difference between metric estimates weighted by SC frequency in actual data
-            RmetricDeviation+=((cumulativeFrequency/numberOfSamples)*fabs(realRmetric-simRmetric));
+            RmetricDeviation+=((cumulativeFrequency/double(numberOfSamples))*fabs(realRmetric-simRmetric));
         }
         // record deviation
         rFitVector[scIndex] = RmetricDeviation;
