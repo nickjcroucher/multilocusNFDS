@@ -797,7 +797,7 @@ int generateMigrantPool(std::vector<std::vector<std::vector<isolate*> > > *migra
         if (migrantFilename != NULL) {
             tmpStrains->push_back(*migrant_population);
         } else {
-            tmpStrains->push_back(*migrant_population);
+            tmpStrains->push_back(*population);
         }
         migrantPool->push_back(*tmpStrains);
     }
