@@ -1055,7 +1055,7 @@ std::vector<int> getValidStrains(std::vector<std::vector<isolate*> > migrantInpu
     
 }
 
-int reproduction(std::vector<isolate*> *currentIsolates,std::vector<isolate*> *futureIsolates,std::vector<std::vector<std::vector<isolate*> > > *migrantPool, std::vector<double> *cogWeights, std::vector<double> *cogDeviations,struct parms *sp, std::vector<double> * ef, std::vector<int> * vtScFreq,std::vector<int> * nvtScFreq,std::vector<double> * piGen,std::vector<int> *scList, int gen,std::vector<double> * timeGen,std::vector<double> * fitGen,std::vector<std::string> * isolateGen,std::vector<int> * countGen) {
+int reproduction(std::vector<isolate*> *currentIsolates,std::vector<isolate*> *futureIsolates,std::vector<std::vector<std::vector<isolate*> > > *migrantPool, std::vector<double> *cogWeights, std::vector<double> *cogDeviations,struct parms *sp, std::vector<double> * ef, std::vector<int> * vtScFreq,std::vector<int> * nvtScFreq,std::vector<double> * piGen,std::vector<int> *scList, int gen,std::vector<double> * timeGen,std::vector<double> * fitGen,std::vector<std::string> * isolateGen,std::vector<int> * countGen, double popLimitFactor) {
     
     // new COG deviations array
     std::vector<int> futureCogCount(ef->size());
@@ -1196,6 +1196,14 @@ int reproduction(std::vector<isolate*> *currentIsolates,std::vector<isolate*> *f
         // tally COGs in new matrix
         for (unsigned int c = 0; c < selectedIsolate->genotype.size(); c++) {
             futureCogCount[c]+=selectedIsolate->genotype[c];
+        }
+    }
+    
+    // halt simulations if next population is above limit
+    if (popLimitFactor > 1.0) {
+        if ((popLimitFactor * double(sp->popSize)) < futureIsolates->size()) {
+            // end process
+            return 8888;
         }
     }
     

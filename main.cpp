@@ -62,6 +62,7 @@ int main(int argc, char * argv[]) {
     char* migrantFilename = NULL;
     char* migrantMarkerFilename = NULL;
     int secondVaccinationGeneration = -100;
+    double popLimitFactor = -1.0;
     bool migrantEvolution = 0;
     bool zeroTimeSelection = 0;
     
@@ -70,7 +71,7 @@ int main(int argc, char * argv[]) {
         return 1;
     } else {
         int opt = 0;
-        while ((opt = getopt(argc,argv,"Ehc:p:s:v:i:t:n:g:u:l:y:j:k:f:x:w:r:o:m:z:e:a:b:d:q:1:2:0")) != EOF) {
+        while ((opt = getopt(argc,argv,"Ehc:p:s:v:i:t:n:g:u:l:y:j:k:f:x:w:r:o:m:z:e:a:b:d:q:F:1:2:0")) != EOF) {
             switch (opt) {
                 case 'h':
                     usage(argv[0]);
@@ -166,6 +167,9 @@ int main(int argc, char * argv[]) {
                     break;
                 case '0':
                     zeroTimeSelection = 1;
+                    break;
+                case 'F':
+                    popLimitFactor = atof(optarg);
                     break;
             }
         }
@@ -433,102 +437,113 @@ int main(int argc, char * argv[]) {
     /////////////////////////////////
     
     // iterate through generations
+    bool continue_reproducing = true;
+    
     for (gen = minGen+1; gen <= genLimit; gen++) {
         
-        // check if vaccine formulation changes
-        if (gen == secondVaccinationGeneration) {
-            int vaccineChangeCheck = alterVaccineFormulation(currentIsolates,population,migrantPool);
-            if (vaccineChangeCheck != 0) {
-                std::cerr << "Unable to correcly alter vaccine status of the population" << std::endl;
-                return 1;
-            }
-        }
+        // prevent further reproduction if population too large
+        if (continue_reproducing) {
         
-        // recombination in subsequent generations
-        if (p.transformationProportion > 0 && p.transformationRate > 0) {
-            // recombination among extant population
-            int transformationCheck = recombination(currentIsolates,futureIsolates,markerFilename,p.transformationProportion,p.transformationRate,p.transformationAsymmetryLoci,p.transformationAsymmetryMarker);
-            if (transformationCheck != 0) {
-                std::cerr << "Extant isolates unable to undergo recombination" << std::endl;
-                return 1;
+            // check if vaccine formulation changes
+            if (gen == secondVaccinationGeneration) {
+                int vaccineChangeCheck = alterVaccineFormulation(currentIsolates,population,migrantPool);
+                if (vaccineChangeCheck != 0) {
+                    std::cerr << "Unable to correcly alter vaccine status of the population" << std::endl;
+                    return 1;
+                }
             }
             
-            if (migrantEvolution) {
-                
-                // recombination among population of migration candidates
-                int populationTransformationCheck = 1;
-                if (migrantFilename != NULL) {
-                    populationTransformationCheck = recombination(migrant_population,new_population,markerFilename,p.transformationProportion,p.transformationRate,p.transformationAsymmetryLoci,p.transformationAsymmetryMarker);
-                } else {
-                    populationTransformationCheck = recombination(population,new_population,markerFilename,p.transformationProportion,p.transformationRate,p.transformationAsymmetryLoci,p.transformationAsymmetryMarker);
-                }
-                if (populationTransformationCheck != 0) {
-                    std::cerr << "Population unable to undergo recombination" << std::endl;
+            // recombination in subsequent generations
+            if (p.transformationProportion > 0 && p.transformationRate > 0) {
+                // recombination among extant population
+                int transformationCheck = recombination(currentIsolates,futureIsolates,markerFilename,p.transformationProportion,p.transformationRate,p.transformationAsymmetryLoci,p.transformationAsymmetryMarker);
+                if (transformationCheck != 0) {
+                    std::cerr << "Extant isolates unable to undergo recombination" << std::endl;
                     return 1;
                 }
                 
-                // use the new population to update the set of isolates used to generate the migrant pools
-                // this is either the original population, or the migrant_population
-                int nextPopulationCheck = 1;
-                if (migrantFilename != NULL) {
-                    nextPopulationCheck = nextGeneration(migrant_population,new_population,currentIsolates,futureIsolates,migrantPool);
-                } else {
-                    nextPopulationCheck = nextGeneration(population,new_population,currentIsolates,futureIsolates,migrantPool);
+                if (migrantEvolution) {
+                    
+                    // recombination among population of migration candidates
+                    int populationTransformationCheck = 1;
+                    if (migrantFilename != NULL) {
+                        populationTransformationCheck = recombination(migrant_population,new_population,markerFilename,p.transformationProportion,p.transformationRate,p.transformationAsymmetryLoci,p.transformationAsymmetryMarker);
+                    } else {
+                        populationTransformationCheck = recombination(population,new_population,markerFilename,p.transformationProportion,p.transformationRate,p.transformationAsymmetryLoci,p.transformationAsymmetryMarker);
+                    }
+                    if (populationTransformationCheck != 0) {
+                        std::cerr << "Population unable to undergo recombination" << std::endl;
+                        return 1;
+                    }
+                    
+                    // use the new population to update the set of isolates used to generate the migrant pools
+                    // this is either the original population, or the migrant_population
+                    int nextPopulationCheck = 1;
+                    if (migrantFilename != NULL) {
+                        nextPopulationCheck = nextGeneration(migrant_population,new_population,currentIsolates,futureIsolates,migrantPool);
+                    } else {
+                        nextPopulationCheck = nextGeneration(population,new_population,currentIsolates,futureIsolates,migrantPool);
+                    }
+                    if (nextPopulationCheck != 0) {
+                        std::cerr << "Cannot store set of population recombinant isolates" << std::endl;
+                        usage(argv[0]);
+                        return 1;
+                    }
+                    
+                    // update migration pools using the updated population/migrant population vectors
+                    int migrationCheck = generateMigrantPool(migrantPool, population, migrant_population, migrantFilename, &scList, maxScNum, minGen, &p);
+                    if (migrationCheck != 0) {
+                        std::cerr << "Unable to generate population for migration in generation " << gen << std::endl;
+                        usage(argv[0]);
+                        return 1;
+                    }
+                    
                 }
-                if (nextPopulationCheck != 0) {
-                    std::cerr << "Cannot store set of population recombinant isolates" << std::endl;
+                
+                // move on to next generation, with updated population
+                // use nextGeneration, rather than update population, to free memory in case of
+                // obsolete genotypes
+                int nextGenerationCheck = nextGeneration(population,new_population,currentIsolates,futureIsolates,migrantPool);
+                if (nextGenerationCheck != 0) {
+                    std::cerr << "Cannot store set of extant recombinant isolates" << std::endl;
                     usage(argv[0]);
                     return 1;
                 }
                 
-                // update migration pools using the updated population/migrant population vectors
-                int migrationCheck = generateMigrantPool(migrantPool, population, migrant_population, migrantFilename, &scList, maxScNum, minGen, &p);
-                if (migrationCheck != 0) {
-                    std::cerr << "Unable to generate population for migration in generation " << gen << std::endl;
-                    usage(argv[0]);
-                    return 1;
+                // if requested, immediately update COG deviations following recombination
+                if (zeroTimeSelection) {
+                    int freq_update_check = update_locus_freq(currentIsolates,&cogWeights,&cogDeviations,&eqFreq);
+                    if (freq_update_check != 0) {
+                        std::cerr << "Cannot update locus frequencies following recombination" << std::endl;
+                        usage(argv[0]);
+                        return 1;
+                    }
                 }
                 
             }
             
-            // move on to next generation, with updated population
-            // use nextGeneration, rather than update population, to free memory in case of
-            // obsolete genotypes
-            int nextGenerationCheck = nextGeneration(population,new_population,currentIsolates,futureIsolates,migrantPool);
-            if (nextGenerationCheck != 0) {
-                std::cerr << "Cannot store set of extant recombinant isolates" << std::endl;
+            // allow cells to reproduce and update COG deviations array
+            int reproCheck = reproduction(currentIsolates,futureIsolates,migrantPool,&cogWeights,&cogDeviations,&p,&eqFreq,&vtScFreq[gen-minGen],&nvtScFreq[gen-minGen],&piGen[gen-minGen],&scList,gen,&timeGen,&fitGen,&isolateGen,&countGen,popLimitFactor);
+            if (reproCheck == 8888) {
+                std::cerr << "Population exceeded limit at generation " << gen << std::endl;
+                // continue iterations to ensure fitting statistics still incremented
+                continue_reproducing = false;
+            } else if (reproCheck != 0) {
+                std::cerr << "Population failed to reproduce at generation " << gen << std::endl;
                 usage(argv[0]);
                 return 1;
             }
             
-            // if requested, immediately update COG deviations following recombination
-            if (zeroTimeSelection) {
-                int freq_update_check = update_locus_freq(currentIsolates,&cogWeights,&cogDeviations,&eqFreq);
-                if (freq_update_check != 0) {
-                    std::cerr << "Cannot update locus frequencies following recombination" << std::endl;
-                    usage(argv[0]);
-                    return 1;
-                }
+            // move on to next generation
+            int updatePopulationCheck = updatePopulation(currentIsolates,futureIsolates);
+            if (updatePopulationCheck != 0) {
+                std::cerr << "Cannot store first set of recombinant isolates" << std::endl;
+                usage(argv[0]);
+                return 1;
             }
-            
-        }
         
-        // allow cells to reproduce and update COG deviations array
-        int reproCheck = reproduction(currentIsolates,futureIsolates,migrantPool,&cogWeights,&cogDeviations,&p,&eqFreq,&vtScFreq[gen-minGen],&nvtScFreq[gen-minGen],&piGen[gen-minGen],&scList,gen,&timeGen,&fitGen,&isolateGen,&countGen);
-        if (reproCheck != 0) {
-            std::cerr << "Population failed to reproduce at generation " << gen << std::endl;
-            usage(argv[0]);
-            return 1;
         }
-        
-        // move on to next generation
-        int updatePopulationCheck = updatePopulation(currentIsolates,futureIsolates);
-        if (updatePopulationCheck != 0) {
-            std::cerr << "Cannot store first set of recombinant isolates" << std::endl;
-            usage(argv[0]);
-            return 1;
-        }
-        
+    
         // compare to genomes
         unsigned int gen_diff = gen-minGen;
         if (gen_diff < samplingList->size() && (*samplingList)[gen_diff] > 0 && p.programme != "s" && p.programme != "x") {
