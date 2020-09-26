@@ -1057,6 +1057,12 @@ std::vector<int> getValidStrains(std::vector<std::vector<isolate*> > migrantInpu
 
 int reproduction(std::vector<isolate*> *currentIsolates,std::vector<isolate*> *futureIsolates,std::vector<std::vector<std::vector<isolate*> > > *migrantPool, std::vector<double> *cogWeights, std::vector<double> *cogDeviations,struct parms *sp, std::vector<double> * ef, std::vector<int> * vtScFreq,std::vector<int> * nvtScFreq,std::vector<double> * piGen,std::vector<int> *scList, int gen,std::vector<double> * timeGen,std::vector<double> * fitGen,std::vector<std::string> * isolateGen,std::vector<int> * countGen, double popLimitFactor) {
     
+    // calculate population limit for memory management
+    int popLimit = round(popLimitFactor * double(sp->popSize));
+    if (popLimit < 0) {
+        popLimit = std::numeric_limits<int>::max();
+    }
+    
     // new COG deviations array
     std::vector<int> futureCogCount(ef->size());
     std::fill (futureCogCount.begin(),futureCogCount.end(),0);
@@ -1124,6 +1130,13 @@ int reproduction(std::vector<isolate*> *currentIsolates,std::vector<isolate*> *f
             futureSerotypes.push_back((*iter)->serotype);
         }
         genotypeCount++;
+        
+        // halt simulations if next population is above limit
+        // add check here for rapidly-expanding populations
+        if (futureIsolates->size() > popLimit) {
+            // end process
+            return 8888;
+        }
         
         // tally their COGs in new matrix
         if (progeny > 0) {
@@ -1200,11 +1213,9 @@ int reproduction(std::vector<isolate*> *currentIsolates,std::vector<isolate*> *f
     }
     
     // halt simulations if next population is above limit
-    if (popLimitFactor > 1.0) {
-        if ((popLimitFactor * double(sp->popSize)) < futureIsolates->size()) {
-            // end process
-            return 8888;
-        }
+    if (futureIsolates->size() > popLimit) {
+        // end process
+        return 8888;
     }
     
     // calculate COG deviations in next generation
