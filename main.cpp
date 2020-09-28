@@ -544,23 +544,25 @@ int main(int argc, char * argv[]) {
         
         }
     
-        // compare to genomes
-        unsigned int gen_diff = gen-minGen;
-        if (gen_diff < samplingList->size() && (*samplingList)[gen_diff] > 0 && p.programme != "s" && p.programme != "x") {
-            int compareSamplesCheck = compareSamples(gen,minGen,(*samplingList)[gen-minGen],currentIsolates,population,accessoryLoci,scList,sampledVtScFreq,sampledNvtScFreq,sampledSeroFreq[gen-minGen],serotypeList,vtCogFittingStatsList,nvtCogFittingStatsList,strainFittingStatsList,sampleOutFile,&p);
-            if (compareSamplesCheck != 0) {
-                std::cerr << "Unable to compare simulated and actual frequencies" << std::endl;
-                usage(argv[0]);
-                return 1;
-            } else {
-                numberComparisons++;
-            }
-        } else if (gen_diff < samplingList->size() && (*samplingList)[gen_diff] > 0 && p.programme == "s") {
-            int justRecordStatsCheck = justRecordStats(gen,minGen,(*samplingList)[gen-minGen],currentIsolates,accessoryLoci);
-            if (justRecordStatsCheck != 0) {
-                std::cerr << "Unable to record simulation statistics" << std::endl;
-                usage(argv[0]);
-                return 1;
+        // compare to genomes in the post-vaccine period
+        if (gen > 0) {
+            unsigned int gen_diff = gen-minGen;
+            if (gen_diff < samplingList->size() && (*samplingList)[gen_diff] > 0 && p.programme != "s" && p.programme != "x") {
+                int compareSamplesCheck = compareSamples(gen,minGen,(*samplingList)[gen-minGen],currentIsolates,population,accessoryLoci,scList,sampledVtScFreq,sampledNvtScFreq,sampledSeroFreq[gen-minGen],serotypeList,vtCogFittingStatsList,nvtCogFittingStatsList,strainFittingStatsList,sampleOutFile,&p);
+                if (compareSamplesCheck != 0) {
+                    std::cerr << "Unable to compare simulated and actual frequencies" << std::endl;
+                    usage(argv[0]);
+                    return 1;
+                } else {
+                    numberComparisons++;
+                }
+            } else if (gen_diff < samplingList->size() && (*samplingList)[gen_diff] > 0 && p.programme == "s") {
+                int justRecordStatsCheck = justRecordStats(gen,minGen,(*samplingList)[gen-minGen],currentIsolates,accessoryLoci);
+                if (justRecordStatsCheck != 0) {
+                    std::cerr << "Unable to record simulation statistics" << std::endl;
+                    usage(argv[0]);
+                    return 1;
+                }
             }
         }
     }
