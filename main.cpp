@@ -549,6 +549,12 @@ int main(int argc, char * argv[]) {
             unsigned int gen_diff = gen-minGen;
             if (gen_diff < samplingList->size() && (*samplingList)[gen_diff] > 0 && p.programme != "s" && p.programme != "x") {
                 int compareSamplesCheck = compareSamples(gen,minGen,(*samplingList)[gen-minGen],currentIsolates,population,accessoryLoci,scList,sampledVtScFreq,sampledNvtScFreq,sampledSeroFreq[gen-minGen],serotypeList,vtCogFittingStatsList,nvtCogFittingStatsList,strainFittingStatsList,sampleOutFile,&p);
+                // penalise simulations where simulation has been halted
+                for (unsigned int i = 0; i < vtCogFittingStatsList.size(); i++) {
+                    vtCogFittingStatsList[i]+=1.0;
+                    nvtCogFittingStatsList[i]+=1.0;
+                    strainFittingStatsList[i]+=1.0;
+                }
                 if (compareSamplesCheck != 0) {
                     std::cerr << "Unable to compare simulated and actual frequencies" << std::endl;
                     usage(argv[0]);
