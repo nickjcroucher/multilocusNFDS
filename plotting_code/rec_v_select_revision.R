@@ -19,6 +19,137 @@ library(magrittr)
 #library(pracma)
 #library(pdist)
 
+plot_through_time<-function(prefixes,recs,selects) {
+  
+  # data structures
+  freq_change_list<-list()
+  div_list<-list()
+  
+  # iterate
+  for (i in 1:6) {
+    
+    # parse
+    fn<-prefixes[i]
+    rec<-recs[i]
+    select<-selects[i]
+    
+    # read data
+    sc_summary.df<-read.table(file=fn,
+                              header = TRUE)
+    
+    # initial processing
+    sc_summary.df %<>%
+      dplyr::rename(Generation = SC) %>%
+      tidyr::pivot_longer(cols = c(-Replicate,-Generation), names_to = "Strain_VT", values_to = "Count") %>%
+      tidyr::separate(Strain_VT, c('Strain','VT'), sep = '_') %>%
+      dplyr::group_by(Replicate,Generation) %>%
+      dplyr::mutate(N_t = sum(Count)) %>%
+      dplyr::ungroup() %>%
+      dplyr::group_by(Replicate,Strain,Generation) %>%
+      dplyr::mutate(TotalCount = sum(Count)) %>%
+      dplyr::mutate(Frequency = TotalCount/N_t) %>%
+      dplyr::ungroup() %>%
+      dplyr::select(-VT,-Count,-TotalCount) %>%
+      dplyr::distinct()
+    
+    # initial v final comparison
+    start_v_end.df<-
+      sc_summary.df %>%
+      dplyr::filter(Generation == 0 | Generation == 60000) %>%
+      dplyr::mutate(Time = dplyr::case_when(
+        Generation == 0 ~ "Initial frequency",
+        Generation == 60000 ~ "Final frequency"
+      )
+      ) %>%
+      dplyr::select(Replicate,Strain,Time,Frequency) %>%
+      tidyr::pivot_wider(names_from = Time, values_from = Frequency, values_fill = 0) %>%
+      dplyr::group_by(Strain) %>%
+      dplyr::summarise(Mean_initial_frequency = mean(`Initial frequency`),
+                       Mean_final_frequency = mean(`Final frequency`),
+                       Upper_initial_frequency = max(`Initial frequency`),
+                       Lower_initial_frequency = min(`Initial frequency`),
+                       Upper_final_frequency = max(`Final frequency`),
+                       Lower_final_frequency = min(`Final frequency`),
+                       Fixed = sum(`Final frequency`==0)/n(),
+                       .groups = "drop_last") %>%
+      dplyr::mutate(Recombination = rec) %>%
+      dplyr::mutate(Selection = select)
+    
+    # diversity calculation
+    diversity.df<-
+      sc_summary.df %>%
+      dplyr::group_by(Replicate,Generation) %>%
+      dplyr::mutate(Diversity = vegan::diversity(Frequency, index = "simpson")) %>%
+      dplyr::group_by(Generation) %>%
+      dplyr::summarise(Mean_div = mean(Diversity),
+                       Max_div = max(Diversity),
+                       Min_div= min(Diversity),
+                       .groups = "drop_last") %>%
+      dplyr::mutate(Recombination = rec) %>%
+      dplyr::mutate(Selection = select)
+    
+    # return
+    freq_change_list[[length(freq_change_list)+1]]<-start_v_end.df
+    div_list[[length(div_list)+1]]<-diversity.df
+  }
+  
+  # generate data frames
+  freq_change.df<-relevel_df(dplyr::bind_rows(freq_change_list))
+  diversity.df<-relevel_df(dplyr::bind_rows(div_list))
+  
+  # return
+  return(list(freq_change.df,diversity.df))
+  
+}
+
+plot_strain_freq_change<-function(in.df) {
+  strain_freq_change_plot<-
+    ggplot(data = in.df,
+           aes(x = Mean_initial_frequency, y = Mean_final_frequency, colour = Fixed)) +
+    geom_point(alpha=my_scatter_alpha,size=0.5,shape=19) +
+    geom_linerange(aes(xmin=Lower_initial_frequency,xmax=Upper_initial_frequency)) +
+    geom_linerange(aes(ymin=Lower_final_frequency,ymax=Upper_final_frequency)) +
+    scale_colour_gradient2(low = my_fill_low,  high = my_fill_high, mid = my_fill_mid, midpoint = 0.5,name="Frequency of\nfixation",limits=c(0,1))+
+    scale_fill_gradient2(low = my_fill_low, high = my_fill_high, mid = my_fill_mid, midpoint = 0.5,name="Frequency of\nfixation",limits=c(0,1)) +
+    ylab("Final frequency") +
+    xlab("Initial frequency") +
+    theme_minimal() +
+    facet_grid(Recombination~Selection) +
+    theme(plot.margin = unit(c(0,0,0,0), "cm"),
+          legend.position = "bottom",
+          panel.spacing = unit(0, "cm"),
+          panel.border = element_rect(color = "black", fill = NA, size = 0.25),
+          axis.text.x = element_text(size = 8, angle = 90, hjust = 1),
+          axis.text.y = element_text(size = 8),
+          axis.title.x = element_text(size = 8, face = "bold"),
+          axis.title.y = element_text(size = 8, face = "bold"),
+          strip.text.x = element_text(size = my_facet_label_size),
+          strip.text.y = element_text(size = my_facet_label_size))
+  return(strain_freq_change_plot)
+}
+
+plot_diversity_over_time<-function(in.df) {
+  div_over_time_plot<-
+    ggplot(data = in.df,
+           aes(x = Generation, y = Mean_div)) + 
+    geom_line(colour = my_fill_low) +
+    geom_ribbon(aes(ymax = Max_div, ymin = Min_div), fill = my_fill_low, alpha = 0.1) +
+    ylab("Simpson's diversity index") +
+    theme_minimal() +
+    facet_grid(Recombination~Selection) +
+    theme(plot.margin = unit(c(0,0,0,0), "cm"),
+          legend.position = "none",
+          panel.spacing = unit(0, "cm"),
+          panel.border = element_rect(color = "black", fill = NA, size = 0.25),
+          axis.text.x = element_text(size = 8, angle = 90, hjust = 1),
+          axis.text.y = element_text(size = 8),
+          axis.title.x = element_text(size = 8, face = "bold"),
+          axis.title.y = element_text(size = 8, face = "bold"),
+          strip.text.x = element_text(size = my_facet_label_size),
+          strip.text.y = element_text(size = my_facet_label_size))
+  return(div_over_time_plot)
+}
+
 # plot strain frequencies over time
 plot_time_series<-function(time_series_prefixes) {
   # function
@@ -352,12 +483,12 @@ relevel_df<-function(df) {
   r<-match("Recombination",colnames(df))
   s<-match("Selection",colnames(df))
   extra_rec_levels<-c()
-  if (is.factor(df[,r])) {
+  if (is.factor(df$Recombination) | class(df)[1] == "tbl_df") {
     extra_rec_levels<-setdiff(df %>% dplyr::select(Recombination)  %>% dplyr::distinct() %>% dplyr::pull(),rec_levels)
   } else {
     extra_rec_levels<-as.character(unique(df[,r])[!(unique(df[,r]) %in% rec_levels)])
   }
-  if (is.factor(df[,s])) {
+  if (is.factor(df$Selection) | class(df)[1] == "tbl_df") {
     extra_select_levels<-setdiff(df %>% dplyr::select(Selection) %>% dplyr::distinct() %>% dplyr::pull(),select_levels)
   } else {
     extra_select_levels<-as.character(unique(df[,s])[!(unique(df[,s]) %in% select_levels)])
@@ -367,12 +498,12 @@ relevel_df<-function(df) {
   if (length(extra_rec_levels) > 0) {rec_levels<-c(rec_levels,extra_rec_levels)}
   if (length(extra_select_levels) > 0) {select_levels<-c(select_levels,extra_select_levels)}
   #df[,r]<-factor(df[,r],levels = rec_levels)
-  if (is.factor(df[,r])) {
+  if (is.factor(df$Recombination) | class(df)[1] == "tbl_df") {
     df[,r]<-factor(df %>% dplyr::select(Recombination) %>% dplyr::pull(), levels = rec_levels)
   } else {
     df[,r]<-factor(df[,r],levels = rec_levels)
   }
-  if (is.factor(df[,s])) {
+  if (is.factor(df$Selection) | class(df)[1] == "tbl_df") {
     df[,s]<-factor(df %>% dplyr::select(Selection) %>% dplyr::pull(),levels = select_levels)
   } else {
     df[,s]<-factor(df[,s],levels = select_levels)
@@ -524,28 +655,44 @@ process_simulation_data<-function(prefixes=NULL,recs=NULL,selects=NULL,summaries
   ############
   
   # plot gene frequencies
+  acc_loci_alpha<-my_line_alpha
+  if (any(grepl("subset",prefixes))) {
+    acc_loci_alpha<-my_scatter_alpha
+  }
   message("Plotting data\n")
   freq_plot<-ggplot(data=locus.df,aes(x=Equilibrium,y=Frequency,colour=Fixed,fill=Fixed))+
     geom_point(alpha=my_scatter_alpha,size=0.5,shape=19,position=position_jitter(width=my_jitter_width,seed=my_jitter_seed))+
-    geom_linerange(aes(ymin=LowerBound,ymax=UpperBound),size=0.5,alpha=my_line_alpha,position=position_jitter(width=my_jitter_width,seed=my_jitter_seed))+
+    geom_linerange(aes(ymin=LowerBound,ymax=UpperBound),size=0.5,alpha=acc_loci_alpha,position=position_jitter(width=my_jitter_width,seed=my_jitter_seed))+
     xlab(expression(bold("Initial frequency in genomic data"~(italic(f)[italic(l)*",0"]))))+
     ylab(expression(bold("Simulated frequency at final timepoint"~(italic(f)[italic(l)*",60000"]))))+
     facet_grid(Recombination~Selection)+
     geom_abline(intercept = 0, slope = 1, linetype = "dashed", colour = my_line_col)+
-    scale_colour_gradient2(low = my_fill_low, mid = my_fill_mid, high = my_fill_high, midpoint = 0.5,name="Frequency of\nfixation")+
-    scale_fill_gradient2(low = my_fill_low, mid = my_fill_mid, high = my_fill_high, midpoint = 0.5,name="Frequency of\nfixation")+
+    scale_colour_gradient2(low = my_fill_low, mid = my_fill_mid, high = my_fill_high, midpoint = 0.5,name="Frequency of\nfixation",limits=c(0,1))+
+    scale_fill_gradient2(low = my_fill_low, mid = my_fill_mid, high = my_fill_high, midpoint = 0.5,name="Frequency of\nfixation",limits=c(0,1))+
     #stat_cor(aes(label = paste("tau ==",bquote(.(..r..)))),colour="black",label.x=0.05,label.y=0.9,hjust = 0,method="kendall",cor.coef.name="tau")
     stat_cor(aes(label = paste("rho ==",bquote(.(..r..)))),colour="black",label.x=0.05,label.y=0.9,hjust = 0,method="spearman",cor.coef.name="rho")
   out_plots[[1]]<-freq_plot
 
   # plot genome sizes
+  default_x<-0.125
+  default_y<-25
+  if (any(grepl("randomised_outputs",prefixes))) {
+    default_x<-0.3
+    default_y<-50
+  } else if (any(grepl("permuted_outputs",prefixes))) {
+    default_x<-0.11
+    default_y<-32
+  } else if (any(grepl("subset",prefixes))) {
+    default_x<-0.5
+    default_y<-10.5
+  }
   genome_plot<-ggplot(data=genotype.df,aes(x=Frequency))+
     geom_density(aes(y=..density..),fill=my_fill_col,alpha=0.5,linetype=0)+
     facet_grid(Recombination~Selection)+
-    xlab(expression("Proportion of loci in genome ("*Sigma^italic(L)*italic(g)[italic("i,l")]*")"))+
+    xlab("Proportion of loci in genome")+
     ylab("Density")+
     geom_density(data=genome_sizes, aes(x=Sizes), col = my_line_col, trim=TRUE)+
-    geom_text(data=genotype.summary.df,x=0.125,y=25,hjust=0,size=my_geom_text_size,aes(label=sprintf("Mean: %.2f\nVariance: %.3g\nSkewness: %.2f\n",Mean,Variance,Skewness)))
+    geom_text(data=genotype.summary.df,x=default_x,y=default_y,hjust=0,size=my_geom_text_size,aes(label=sprintf("Mean: %.2f\nVariance: %.2g\nSkewness: %.2f\n",Mean,Variance,Skewness)))
   out_plots[[2]]<-genome_plot
 
   # plot pairwise distances
@@ -556,7 +703,7 @@ process_simulation_data<-function(prefixes=NULL,recs=NULL,selects=NULL,summaries
     ylab("Density (log(density+1) scale)")+
     geom_density(data=genome_distances, aes(x=Distances, y=..scaled..), col = my_line_col, trim=TRUE)+
     scale_y_continuous(trans="log1p")+
-    geom_text(data=dist.summary.df,x=0.0,y=0.6,hjust=0,size=my_geom_text_size,aes(label=sprintf("Mean: %.2f\nVariance: %.3g\nSkewness: %.2f\n",Mean,Variance,Skewness)))
+    geom_text(data=dist.summary.df,x=0.0,y=0.6,hjust=0,size=my_geom_text_size,aes(label=sprintf("Mean: %.2f\nVariance: %.2g\nSkewness: %.2f\n",Mean,Variance,Skewness)))
   out_plots[[3]]<-distance_plot
 
   # plot distances to real data
@@ -578,8 +725,8 @@ process_simulation_data<-function(prefixes=NULL,recs=NULL,selects=NULL,summaries
       ylab(expression(bold("Simulated frequency at final timepoint"~(italic(f)[italic(s)*",60000"]))))+
       facet_grid(Recombination~Selection)+
       geom_abline(intercept = 0, slope = 1, linetype = "dashed", colour = "red")+
-      scale_colour_gradient2(low = my_fill_low,  high = my_fill_high, mid = my_fill_mid, midpoint = 0.5,name="Frequency of\nfixation")+
-      scale_fill_gradient2(low = my_fill_low, high = my_fill_high, mid = my_fill_mid, midpoint = 0.5,name="Frequency of\nfixation")+
+      scale_colour_gradient2(low = my_fill_low,  high = my_fill_high, mid = my_fill_mid, midpoint = 0.5,name="Frequency of\nfixation",limits=c(0,1))+
+      scale_fill_gradient2(low = my_fill_low, high = my_fill_high, mid = my_fill_mid, midpoint = 0.5,name="Frequency of\nfixation",limits=c(0,1))+
       #stat_cor(aes(label = paste("tau ==",bquote(.(..r..)))),colour="black",label.x=0.05,label.y=0.9,hjust = 0,method="kendall",cor.coef.name="tau")
       stat_cor(aes(label = paste("rho ==",bquote(.(..r..)))),colour="black",label.x=0.05,label.y=0.9,hjust = 0,method="spearman",cor.coef.name="rho")
     out_plots[[5]]<-snp_plot
@@ -602,6 +749,27 @@ process_simulation_data<-function(prefixes=NULL,recs=NULL,selects=NULL,summaries
       dplyr::group_by(Recombination,Selection) %>%
       dplyr::mutate(PropWithin = sum(WithinStrain)/n()) %>%
       dplyr::ungroup()
+    # text position
+    default_x_prop<-0.30
+    default_x_corr<-default_x_prop*0.9
+    default_y_corr<-0.16
+    default_y_prop<-0.32
+    if (any(grepl("randomised_outputs",prefixes))) {
+      default_x_prop<-0.43
+      default_x_corr<-default_x_prop*0.9
+      default_y_corr<-0.03
+      default_y_prop<-0.19
+    } else if (any(grepl("permuted_outputs",prefixes))) {
+      default_x_prop<-0.285
+      default_x_corr<-default_x_prop*0.9
+      default_y_corr<-0.23
+      default_y_prop<-0.39
+    } else if (any(grepl("subset",prefixes))) {
+      default_x_prop<-0.28
+      default_y_prop<-0.1
+      default_x_corr<-0.05
+      default_y_corr<-0.9
+    }
     # then plot
     comparison_distance_plot<-
       ggplot(data=snp.dist.df,aes(x=SNPDistances,y=Distances))+
@@ -609,15 +777,14 @@ process_simulation_data<-function(prefixes=NULL,recs=NULL,selects=NULL,summaries
       facet_grid(Recombination~Selection)+
       xlab("Pairwise Hamming SNP distances between genomes")+
       ylab("Pairwise binary Jaccard distances between genomes")+
-      #stat_cor(aes(label = paste("tau ==",bquote(.(..r..)))),colour="black",label.x=0.29,label.y=0.28,hjust = 0,method="kendall",cor.coef.name="tau")+
-      stat_cor(aes(label = paste("rho ==",bquote(.(..r..)))),colour="black",label.x=0.29,label.y=0.28,hjust = 0,method="spearman",cor.coef.name="rho")+
       geom_abline(colour=my_line_col, slope = strain_slope, intercept = strain_intercept, alpha=0.5, linetype = 2)+
       geom_density_2d(data=genome_distances[genome_distances$Distances>=(strain_intercept+strain_slope*genome_distances$SNPDistances),], aes(x=SNPDistances, y=Distances), colour = pal_npg()(2)[2], alpha = 0.5,size=0.5)+
       geom_density_2d(data=genome_distances[genome_distances$Distances<(strain_intercept+strain_slope*genome_distances$SNPDistances),], aes(x=SNPDistances, y=Distances), colour = my_fill_high, alpha = 0.5,size=0.5) +
+      stat_cor(aes(label = paste("rho ==",bquote(.(..r..)))),colour="black",label.x=default_x_corr,label.y=default_y_corr,hjust = 0,method="spearman",cor.coef.name="rho") +
       geom_text(data = snp.dist.df %>% dplyr::select(Recombination,Selection,PropWithin) %>% dplyr::distinct(),
                 aes(label = sprintf("Within strain\nproportion:  %.2f",PropWithin)),
-                x = 0.325,
-                y = 0.4)
+                x = default_x_prop,
+                y = default_y_prop)
     out_plots[[7]]<-comparison_distance_plot
     
     # plot trees
@@ -647,7 +814,6 @@ process_simulation_data<-function(prefixes=NULL,recs=NULL,selects=NULL,summaries
                                        hjust = 0)
     
     # plot strain frequencies
-    max_rank<-20
     strain_frequency_plot<-ggplot(data=strain.freq.df[strain.freq.df$Rank<=max_rank,],aes(x=Rank,y=Frequency))+
       geom_point(color=my_fill_low)+
       geom_linerange(aes(ymin=MinFrequency,ymax=MaxFrequency),alpha=0.5,color=my_fill_low)+
@@ -657,7 +823,7 @@ process_simulation_data<-function(prefixes=NULL,recs=NULL,selects=NULL,summaries
       xlab("Ranked frequency of strain")+
       ylab("Frequency in population")+
       scale_y_continuous(trans="log1p")+
-      geom_text(x = 12.5, y = 0.45, aes(label=sprintf("Simpson's diversity index: %.3f",Diversity)))
+      geom_text(x = 11, y = 0.45, aes(label=sprintf("Simpson's diversity index: %.3f",Diversity)))
     out_plots[[9]]<-strain_frequency_plot
   }
   
@@ -845,6 +1011,10 @@ format_plots<-function(raw_plot_list,prefix="test") {
                                                                     legend.position = "bottom",
                                                                     legend.title = element_blank())
   ggsave(snpdist_comp_plot,file=paste0("~/Documents/evoMLNFDS/rec_v_select/zero_time/figures/",prefix,"snpdist_comp_plot.png"),width = 15,height = 17.5, units="cm")
+  # plot timeseries
+  ggsave(raw_plot_list[[1]][[14]],file=paste0("~/Documents/evoMLNFDS/rec_v_select/zero_time/figures/",prefix,"timeseries_example_plot.png"),width = 15,height = 17.5, units="cm")
+  ggsave(raw_plot_list[[1]][[15]],file=paste0("~/Documents/evoMLNFDS/rec_v_select/zero_time/figures/",prefix,"strain_freq_change_plot.png"),width = 15,height = 17.5, units="cm")
+  ggsave(raw_plot_list[[1]][[16]],file=paste0("~/Documents/evoMLNFDS/rec_v_select/zero_time/figures/",prefix,"diversity_change_plot.png"),width = 15,height = 17.5, units="cm")
 }
 
 plot_simulation_comparison<-function(sims,actual,vals_colname="Frequency") {
@@ -1021,15 +1191,15 @@ ma.dists<-ggplot(genome_distances,aes(x=SNPDistances,y=Distances))+geom_point(al
   xlab("Pairwise Hamming SNP distances between genomes")+
   ylab("Pairwise binary Jaccard distances between genomes")+
   #stat_cor(aes(label = paste("tau ==",bquote(.(..r..)))),colour="black",label.x=0.29,label.y=0.2,hjust = 0,method="kendall",cor.coef.name="tau")+
-  stat_cor(aes(label = paste("rho ==",bquote(.(..r..)))),colour="black",label.x=0.29,label.y=0.2,hjust = 0,method="spearman",cor.coef.name="rho")+
+  stat_cor(aes(label = paste("rho ==",bquote(.(..r..)))),colour="black",label.x=0.27,label.y=0.16,hjust = 0,method="spearman",cor.coef.name="rho")+
   geom_density_2d(data=genome_distances[genome_distances$Distances>=(strain_divide_intercept+strain_divide_slope*genome_distances$SNPDistances),], aes(x=SNPDistances, y=Distances), colour = pal_npg()(2)[2], alpha = 0.5, size = 0.5)+
   geom_density_2d(data=genome_distances[genome_distances$Distances<(strain_divide_intercept+strain_divide_slope*genome_distances$SNPDistances),], aes(x=SNPDistances, y=Distances), colour = my_fill_high, alpha = 0.5, size = 0.5)+
   #geom_density_2d(data=genome_distances %>% dplyr::filter(!WithinStrain), aes(x=SNPDistances, y=Distances), colour = pal_npg()(2)[2], alpha = 0.5, size = 0.5)+
   #geom_density_2d(data=genome_distances %>% dplyr::filter(WithinStrain), aes(x=SNPDistances, y=Distances), colour = my_fill_high, alpha = 0.5, size = 0.5)+
   geom_text(data = genome_distances %>% dplyr::select(PropWithin) %>% dplyr::distinct(),
             aes(label = sprintf("Within strain\nproportion:  %.2f",PropWithin)),
-            x = 0.325,
-            y = 0.3) +
+            x = 0.30,
+            y = 0.32) +
   theme_minimal()+theme(plot.margin = unit(c(0,0,0,0), "cm"),
                          panel.spacing = unit(0, "cm"),
                          panel.border = element_rect(color = "black", fill = NA, size = 0.25),
@@ -1048,8 +1218,30 @@ genome_distances.stats$Selection<-"Genome data"
 getDistStats(genome_distances.stats,"Distances")
 getDistStats(genome_distances.stats,"SNPDistances")
 
-# calculate strain frequencies from genomic data
+# calculate strain frequencies from genomic data and plot
+max_rank<-20
 ma.strain.freqs<-get_strain_frequencies(genome_distances,slope=strain_divide_slope,intercept=strain_divide_intercept)
+ma.strain.freqs %<>%
+  dplyr::mutate(Diversity = vegan::diversity(Frequencies, index = "simpson"))
+
+ma_strain_freq_plot<-
+  ggplot(data = ma.strain.freqs[ma.strain.freqs$Rank<=max_rank,], aes(x=Rank,y=Frequencies)) +
+  geom_point(colour=my_line_col,shape=4)+
+  xlim(0,max_rank)+
+  xlab("Ranked frequency of strain")+
+  ylab("Frequency in population")+
+  scale_y_continuous(trans="log1p")+
+  geom_text(x = 11, y = 0.10, aes(label=sprintf("Simpson's diversity index: %.3f",Diversity))) +
+  theme_minimal()+theme(plot.margin = unit(c(0,0,0,0), "cm"),
+                        panel.spacing = unit(0, "cm"),
+                        panel.border = element_rect(color = "black", fill = NA, size = 0.25),
+                        axis.text.x = element_text(size = 8, angle = 90, hjust = 1),
+                        axis.text.y = element_text(size = 8),
+                        axis.title.x = element_text(size = 8, face = "bold"),
+                        axis.title.y = element_text(size = 8, face = "bold"),
+                        strip.text.x = element_text(size = my_facet_label_size),
+                        strip.text.y = element_text(size = my_facet_label_size))
+ggsave(ma_strain_freq_plot,file="~/Documents/evoMLNFDS/rec_v_select/zero_time/figures/revised.ma_strain_freqs.png",height=8.5,width=8.5,units = "cm")
 
 # now recalculate distances, excluding the MGE COGs
 cog_annotation<-read.table(file="/Users/nicholascroucher/Documents/frequencyDependence/FOR_PUB/population_comparison/annotated_intermediate_cogs.tab",header=FALSE)
@@ -1075,6 +1267,88 @@ nomge.ma.dists<-ggplot(nomge_genome_distances,aes(x=SNPDistances,y=Distances))+g
 
 ggsave(nomge.ma.dists,file="~/Documents/evoMLNFDS/rec_v_select/zero_time/figures/revised.nomge.ma_dists.png",height=20,width=20,units = "cm")
 
+###############
+# Weak subset #
+###############
+
+# analysis with markers
+subset_weak_prefixes<-c("/Users/nicholascroucher/Documents/evoMLNFDS/rec_v_select/subset_inputs/rec_v_weak_select_no_mig/rec_v_weak_select_no_mig",
+                        "/Users/nicholascroucher/Documents/evoMLNFDS/rec_v_select/subset_inputs/rec_v_no_select_no_mig/rec_v_no_select_no_mig",
+                        "/Users/nicholascroucher/Documents/evoMLNFDS/rec_v_select/subset_inputs/no_rec_v_weak_select_no_mig/no_rec_v_weak_select_no_mig",
+                        "/Users/nicholascroucher/Documents/evoMLNFDS/rec_v_select/subset_inputs/no_rec_v_no_select_no_mig/no_rec_v_no_select_no_mig",
+                        "/Users/nicholascroucher/Documents/evoMLNFDS/rec_v_select/subset_inputs/sym_rec_v_weak_select_no_mig/sym_rec_v_weak_select_no_mig",
+                        "/Users/nicholascroucher/Documents/evoMLNFDS/rec_v_select/subset_inputs/sym_rec_v_no_select_no_mig/sym_rec_v_no_select_no_mig"
+)
+
+subset_weak_plots<-process_simulation_data(prefixes=subset_weak_prefixes,recs=recs,selects=selects,summaries=summaries,eq.loci=eq.loci,real.data=ma.data,snp.loci=snp.loci,snp.calc=TRUE,strain_slope=strain_divide_slope,strain_intercept=strain_divide_intercept,tip.anno=ma.tip.labels,real_strains=ma.strain.freqs,tree_data=ma.tree.stats)
+
+subset_weak_time_series_prefixes<-c("/Users/nicholascroucher/Documents/evoMLNFDS/rec_v_select/zero_time/time_series/subset.rec_v_weak_select_no_mig",
+                                    "/Users/nicholascroucher/Documents/evoMLNFDS/rec_v_select/zero_time/time_series/subset.rec_v_no_select_no_mig",
+                                    "/Users/nicholascroucher/Documents/evoMLNFDS/rec_v_select/zero_time/time_series/subset.no_rec_v_weak_select_no_mig",
+                                    "/Users/nicholascroucher/Documents/evoMLNFDS/rec_v_select/zero_time/time_series/subset.no_rec_v_no_select_no_mig",
+                                    "/Users/nicholascroucher/Documents/evoMLNFDS/rec_v_select/zero_time/time_series/subset.sym_rec_v_weak_select_no_mig",
+                                    "/Users/nicholascroucher/Documents/evoMLNFDS/rec_v_select/zero_time/time_series/subset.sym_rec_v_no_select_no_mig"
+)
+subset_weak_plots[[1]][[length(subset_weak_plots[[1]])+1]]<-plot_time_series(subset_weak_time_series_prefixes)
+
+# time series summaries
+subset_weak_time_series_summary_prefixes<-c(
+  "~/Documents/evoMLNFDS/rec_v_select/zero_time/time_series/subset.rec_v_weak_select_no_mig.combined_sc.out",
+  "~/Documents/evoMLNFDS/rec_v_select/zero_time/time_series/subset.rec_v_no_select_no_mig.combined_sc.out",
+  "~/Documents/evoMLNFDS/rec_v_select/zero_time/time_series/subset.no_rec_v_weak_select_no_mig.combined_sc.out",
+  "~/Documents/evoMLNFDS/rec_v_select/zero_time/time_series/subset.no_rec_v_no_select_no_mig.combined_sc.out",
+  "~/Documents/evoMLNFDS/rec_v_select/zero_time/time_series/subset.sym_rec_v_weak_select_no_mig.combined_sc.out",
+  "~/Documents/evoMLNFDS/rec_v_select/zero_time/time_series/subset.sym_rec_v_no_select_no_mig.combined_sc.out"
+)
+
+subset_weak_longitudinal_outputs<-plot_through_time(subset_weak_time_series_summary_prefixes,recs,selects)
+subset_weak_plots[[1]][[length(subset_weak_plots[[1]])+1]]<-plot_strain_freq_change(subset_weak_longitudinal_outputs[[1]])
+subset_weak_plots[[1]][[length(subset_weak_plots[[1]])+1]]<-plot_diversity_over_time(subset_weak_longitudinal_outputs[[2]])
+
+# save figures
+format_plots(subset_weak_plots,"revised.subset_weak_genotypes_")
+
+##############
+# Randomised #
+##############
+
+# analysis with markers
+randomised_prefixes<-c("/Users/nicholascroucher/Documents/evoMLNFDS/rec_v_select/randomised_inputs/randomised_outputs/rec_v_select_no_mig/rec_v_select_no_mig",
+                     "/Users/nicholascroucher/Documents/evoMLNFDS/rec_v_select/randomised_inputs/randomised_outputs/rec_v_no_select_no_mig/rec_v_no_select_no_mig",
+                     "/Users/nicholascroucher/Documents/evoMLNFDS/rec_v_select/randomised_inputs/randomised_outputs/no_rec_v_select_no_mig/no_rec_v_select_no_mig",
+                     "/Users/nicholascroucher/Documents/evoMLNFDS/rec_v_select/randomised_inputs/randomised_outputs/no_rec_v_no_select_no_mig/no_rec_v_no_select_no_mig",
+                     "/Users/nicholascroucher/Documents/evoMLNFDS/rec_v_select/randomised_inputs/randomised_outputs/sym_rec_v_select_no_mig/sym_rec_v_select_no_mig",
+                     "/Users/nicholascroucher/Documents/evoMLNFDS/rec_v_select/randomised_inputs/randomised_outputs/sym_rec_v_no_select_no_mig/sym_rec_v_no_select_no_mig"
+)
+
+randomised_plots<-process_simulation_data(prefixes=randomised_prefixes,recs=recs,selects=selects,summaries=summaries,eq.loci=eq.loci,real.data=ma.data,snp.loci=snp.loci,snp.calc=TRUE,strain_slope=strain_divide_slope,strain_intercept=strain_divide_intercept,tip.anno=ma.tip.labels,real_strains=ma.strain.freqs,tree_data=ma.tree.stats)
+
+randomised_time_series_prefixes<-c("/Users/nicholascroucher/Documents/evoMLNFDS/rec_v_select/randomised_inputs/randomised_outputs/rec_v_select_no_mig/rec_v_select_no_mig",
+                                 "/Users/nicholascroucher/Documents/evoMLNFDS/rec_v_select/randomised_inputs/randomised_outputs/rec_v_no_select_no_mig/rec_v_no_select_no_mig",
+                                 "/Users/nicholascroucher/Documents/evoMLNFDS/rec_v_select/randomised_inputs/randomised_outputs/no_rec_v_select_no_mig/no_rec_v_select_no_mig",
+                                 "/Users/nicholascroucher/Documents/evoMLNFDS/rec_v_select/randomised_inputs/randomised_outputs/no_rec_v_no_select_no_mig/no_rec_v_no_select_no_mig",
+                                 "/Users/nicholascroucher/Documents/evoMLNFDS/rec_v_select/randomised_inputs/randomised_outputs/sym_rec_v_select_no_mig/sym_rec_v_select_no_mig",
+                                 "/Users/nicholascroucher/Documents/evoMLNFDS/rec_v_select/randomised_inputs/randomised_outputs/sym_rec_v_no_select_no_mig/sym_rec_v_no_select_no_mig"
+)
+randomised_plots[[1]][[length(randomised_plots[[1]])+1]]<-plot_time_series(randomised_time_series_prefixes)
+
+# time series summaries
+randomised_time_series_summary_prefixes<-c(
+  "~/Documents/evoMLNFDS/rec_v_select/randomised_inputs/randomised_outputs/randomised.rec_v_select_no_mig.combined_sc.out",
+  "~/Documents/evoMLNFDS/rec_v_select/randomised_inputs/randomised_outputs/randomised.rec_v_no_select_no_mig.combined_sc.out",
+  "~/Documents/evoMLNFDS/rec_v_select/randomised_inputs/randomised_outputs/randomised.no_rec_v_select_no_mig.combined_sc.out",
+  "~/Documents/evoMLNFDS/rec_v_select/randomised_inputs/randomised_outputs/randomised.no_rec_v_no_select_no_mig.combined_sc.out",
+  "~/Documents/evoMLNFDS/rec_v_select/randomised_inputs/randomised_outputs/randomised.sym_rec_v_select_no_mig.combined_sc.out",
+  "~/Documents/evoMLNFDS/rec_v_select/randomised_inputs/randomised_outputs/randomised.sym_rec_v_no_select_no_mig.combined_sc.out"
+)
+
+randomised_longitudinal_outputs<-plot_through_time(randomised_time_series_summary_prefixes,recs,selects)
+randomised_plots[[1]][[length(randomised_plots[[1]])+1]]<-plot_strain_freq_change(randomised_longitudinal_outputs[[1]])
+randomised_plots[[1]][[length(randomised_plots[[1]])+1]]<-plot_diversity_over_time(randomised_longitudinal_outputs[[2]])
+
+# save figures
+format_plots(randomised_plots,"revised.randomised_genotypes_")
+
 ############
 # Permuted #
 ############
@@ -1090,8 +1364,31 @@ permuted_prefixes<-c("/Users/nicholascroucher/Documents/evoMLNFDS/rec_v_select/r
 
 permuted_plots<-process_simulation_data(prefixes=permuted_prefixes,recs=recs,selects=selects,summaries=summaries,eq.loci=eq.loci,real.data=ma.data,snp.loci=snp.loci,snp.calc=TRUE,strain_slope=strain_divide_slope,strain_intercept=strain_divide_intercept,tip.anno=ma.tip.labels,real_strains=ma.strain.freqs,tree_data=ma.tree.stats)
 
+permuted_time_series_prefixes<-c("/Users/nicholascroucher/Documents/evoMLNFDS/rec_v_select/randomised_inputs/permuted_outputs/rec_v_select_no_mig/rec_v_select_no_mig",
+                               "/Users/nicholascroucher/Documents/evoMLNFDS/rec_v_select/randomised_inputs/permuted_outputs/rec_v_no_select_no_mig/rec_v_no_select_no_mig",
+                               "/Users/nicholascroucher/Documents/evoMLNFDS/rec_v_select/randomised_inputs/permuted_outputs/no_rec_v_select_no_mig/no_rec_v_select_no_mig",
+                               "/Users/nicholascroucher/Documents/evoMLNFDS/rec_v_select/randomised_inputs/permuted_outputs/no_rec_v_no_select_no_mig/no_rec_v_no_select_no_mig",
+                               "/Users/nicholascroucher/Documents/evoMLNFDS/rec_v_select/randomised_inputs/permuted_outputs/sym_rec_v_select_no_mig/sym_rec_v_select_no_mig",
+                               "/Users/nicholascroucher/Documents/evoMLNFDS/rec_v_select/randomised_inputs/permuted_outputs/sym_rec_v_no_select_no_mig/sym_rec_v_no_select_no_mig"
+)
+permuted_plots[[1]][[length(permuted_plots[[1]])+1]]<-plot_time_series(permuted_time_series_prefixes)
+
+# time series summaries
+permuted_time_series_summary_prefixes<-c(
+  "~/Documents/evoMLNFDS/rec_v_select/randomised_inputs/permuted_outputs/permuted.rec_v_select_no_mig.combined_sc.out",
+  "~/Documents/evoMLNFDS/rec_v_select/randomised_inputs/permuted_outputs/permuted.rec_v_no_select_no_mig.combined_sc.out",
+  "~/Documents/evoMLNFDS/rec_v_select/randomised_inputs/permuted_outputs/permuted.no_rec_v_select_no_mig.combined_sc.out",
+  "~/Documents/evoMLNFDS/rec_v_select/randomised_inputs/permuted_outputs/permuted.no_rec_v_no_select_no_mig.combined_sc.out",
+  "~/Documents/evoMLNFDS/rec_v_select/randomised_inputs/permuted_outputs/permuted.sym_rec_v_select_no_mig.combined_sc.out",
+  "~/Documents/evoMLNFDS/rec_v_select/randomised_inputs/permuted_outputs/permuted.sym_rec_v_no_select_no_mig.combined_sc.out"
+)
+
+permuted_longitudinal_outputs<-plot_through_time(permuted_time_series_summary_prefixes,recs,selects)
+permuted_plots[[1]][[length(permuted_plots[[1]])+1]]<-plot_strain_freq_change(permuted_longitudinal_outputs[[1]])
+permuted_plots[[1]][[length(permuted_plots[[1]])+1]]<-plot_diversity_over_time(permuted_longitudinal_outputs[[2]])
+
 # save figures
-format_plots(permuted_plots,"revised.permuted_genotypes")
+format_plots(permuted_plots,"revised.permuted_genotypes_")
 
 ##########
 # Subset #
@@ -1108,8 +1405,31 @@ subset_prefixes<-c("/Users/nicholascroucher/Documents/evoMLNFDS/rec_v_select/sub
 
 subset_plots<-process_simulation_data(prefixes=subset_prefixes,recs=recs,selects=selects,summaries=summaries,eq.loci=eq.loci,real.data=ma.data,snp.loci=snp.loci,snp.calc=TRUE,strain_slope=strain_divide_slope,strain_intercept=strain_divide_intercept,tip.anno=ma.tip.labels,real_strains=ma.strain.freqs,tree_data=ma.tree.stats)
 
+subset_time_series_prefixes<-c("/Users/nicholascroucher/Documents/evoMLNFDS/rec_v_select/zero_time/time_series/subset.rec_v_select_no_mig",
+                            "/Users/nicholascroucher/Documents/evoMLNFDS/rec_v_select/zero_time/time_series/subset.rec_v_no_select_no_mig",
+                            "/Users/nicholascroucher/Documents/evoMLNFDS/rec_v_select/zero_time/time_series/subset.no_rec_v_select_no_mig",
+                            "/Users/nicholascroucher/Documents/evoMLNFDS/rec_v_select/zero_time/time_series/subset.no_rec_v_no_select_no_mig",
+                            "/Users/nicholascroucher/Documents/evoMLNFDS/rec_v_select/zero_time/time_series/subset.sym_rec_v_select_no_mig",
+                            "/Users/nicholascroucher/Documents/evoMLNFDS/rec_v_select/zero_time/time_series/subset.sym_rec_v_no_select_no_mig"
+)
+subset_plots[[1]][[length(subset_plots[[1]])+1]]<-plot_time_series(subset_time_series_prefixes)
+
+# time series summaries
+subset_time_series_summary_prefixes<-c(
+  "~/Documents/evoMLNFDS/rec_v_select/zero_time/time_series/subset.rec_v_select_no_mig.combined_sc.out",
+  "~/Documents/evoMLNFDS/rec_v_select/zero_time/time_series/subset.rec_v_no_select_no_mig.combined_sc.out",
+  "~/Documents/evoMLNFDS/rec_v_select/zero_time/time_series/subset.no_rec_v_select_no_mig.combined_sc.out",
+  "~/Documents/evoMLNFDS/rec_v_select/zero_time/time_series/subset.no_rec_v_no_select_no_mig.combined_sc.out",
+  "~/Documents/evoMLNFDS/rec_v_select/zero_time/time_series/subset.sym_rec_v_select_no_mig.combined_sc.out",
+  "~/Documents/evoMLNFDS/rec_v_select/zero_time/time_series/subset.sym_rec_v_no_select_no_mig.combined_sc.out"
+)
+
+subset_longitudinal_outputs<-plot_through_time(subset_time_series_summary_prefixes,recs,selects)
+subset_plots[[1]][[length(subset_plots[[1]])+1]]<-plot_strain_freq_change(subset_longitudinal_outputs[[1]])
+subset_plots[[1]][[length(subset_plots[[1]])+1]]<-plot_diversity_over_time(subset_longitudinal_outputs[[2]])
+
 # save figures
-format_plots(subset_plots,"revised.subset_genotypes")
+format_plots(subset_plots,"revised.subset_genotypes_")
 
 #############
 # Migration #
@@ -1125,6 +1445,29 @@ marker_prefixes<-c("~/Documents/evoMLNFDS/rec_v_select/zero_time/rec_v_select_mi
 )
 
 marker_plots<-process_simulation_data(prefixes=marker_prefixes,recs=recs,selects=selects,summaries=summaries,eq.loci=eq.loci,real.data=ma.data,snp.loci=snp.loci,snp.calc=TRUE,strain_slope=strain_divide_slope,strain_intercept=strain_divide_intercept,tip.anno=ma.tip.labels,real_strains=ma.strain.freqs,tree_data=ma.tree.stats)
+
+mig_time_series_prefixes<-c("/Users/nicholascroucher/Documents/evoMLNFDS/rec_v_select/zero_time/time_series/rec_v_select_mig",
+                            "/Users/nicholascroucher/Documents/evoMLNFDS/rec_v_select/zero_time/time_series/rec_v_no_select_mig",
+                            "/Users/nicholascroucher/Documents/evoMLNFDS/rec_v_select/zero_time/time_series/no_rec_v_select_mig",
+                            "/Users/nicholascroucher/Documents/evoMLNFDS/rec_v_select/zero_time/time_series/no_rec_v_no_select_mig",
+                            "/Users/nicholascroucher/Documents/evoMLNFDS/rec_v_select/zero_time/time_series/sym_rec_v_select_mig",
+                            "/Users/nicholascroucher/Documents/evoMLNFDS/rec_v_select/zero_time/time_series/sym_rec_v_no_select_mig"
+)
+marker_plots[[1]][[length(marker_plots[[1]])+1]]<-plot_time_series(mig_time_series_prefixes)
+
+# time series summaries
+marker_time_series_summary_prefixes<-c(
+  "~/Documents/evoMLNFDS/rec_v_select/zero_time/time_series/rec_v_select_mig.combined_sc.out",
+  "~/Documents/evoMLNFDS/rec_v_select/zero_time/time_series/rec_v_no_select_mig.combined_sc.out",
+  "~/Documents/evoMLNFDS/rec_v_select/zero_time/time_series/no_rec_v_select_mig.combined_sc.out",
+  "~/Documents/evoMLNFDS/rec_v_select/zero_time/time_series/no_rec_v_no_select_mig.combined_sc.out",
+  "~/Documents/evoMLNFDS/rec_v_select/zero_time/time_series/sym_rec_v_select_mig.combined_sc.out",
+  "~/Documents/evoMLNFDS/rec_v_select/zero_time/time_series/sym_rec_v_no_select_mig.combined_sc.out"
+)
+
+marker_longitudinal_outputs<-plot_through_time(marker_time_series_summary_prefixes,recs,selects)
+marker_plots[[1]][[length(marker_plots[[1]])+1]]<-plot_strain_freq_change(marker_longitudinal_outputs[[1]])
+marker_plots[[1]][[length(marker_plots[[1]])+1]]<-plot_diversity_over_time(marker_longitudinal_outputs[[2]])
 
 # save figures
 format_plots(marker_plots,"revised.multistrain_with_migration_")
@@ -1143,6 +1486,30 @@ no_migration_prefixes<-c("~/Documents/evoMLNFDS/rec_v_select/zero_time/rec_v_sel
 )
 
 no_mig_plots<-process_simulation_data(prefixes=no_migration_prefixes,recs=recs,selects=selects,summaries=summaries,eq.loci=eq.loci,real.data=ma.data,snp.loci=snp.loci,snp.calc=TRUE,strain_slope=strain_divide_slope,strain_intercept=strain_divide_intercept,tip.anno=ma.tip.labels,real_strains=ma.strain.freqs,tree_data=ma.tree.stats)
+
+# example time series
+no_mig_time_series_prefixes<-c("/Users/nicholascroucher/Documents/evoMLNFDS/rec_v_select/zero_time/time_series/rec_v_select_no_mig",
+                               "/Users/nicholascroucher/Documents/evoMLNFDS/rec_v_select/zero_time/time_series/rec_v_no_select_no_mig",
+                               "/Users/nicholascroucher/Documents/evoMLNFDS/rec_v_select/zero_time/time_series/no_rec_v_select_no_mig",
+                               "/Users/nicholascroucher/Documents/evoMLNFDS/rec_v_select/zero_time/time_series/no_rec_v_no_select_no_mig",
+                               "/Users/nicholascroucher/Documents/evoMLNFDS/rec_v_select/zero_time/time_series/sym_rec_v_select_no_mig",
+                               "/Users/nicholascroucher/Documents/evoMLNFDS/rec_v_select/zero_time/time_series/sym_rec_v_no_select_no_mig"
+)
+no_mig_plots[[1]][[length(no_mig_plots[[1]])+1]]<-plot_time_series(no_mig_time_series_prefixes)
+
+# time series summaries
+no_mig_time_series_summary_prefixes<-c(
+  "~/Documents/evoMLNFDS/rec_v_select/zero_time/time_series/rec_v_select_no_mig.combined_sc.out",
+  "~/Documents/evoMLNFDS/rec_v_select/zero_time/time_series/rec_v_no_select_no_mig.combined_sc.out",
+  "~/Documents/evoMLNFDS/rec_v_select/zero_time/time_series/no_rec_v_select_no_mig.combined_sc.out",
+  "~/Documents/evoMLNFDS/rec_v_select/zero_time/time_series/no_rec_v_no_select_no_mig.combined_sc.out",
+  "~/Documents/evoMLNFDS/rec_v_select/zero_time/time_series/sym_rec_v_select_no_mig.combined_sc.out",
+  "~/Documents/evoMLNFDS/rec_v_select/zero_time/time_series/sym_rec_v_no_select_no_mig.combined_sc.out"
+)
+
+no_mig_longitudinal_outputs<-plot_through_time(no_mig_time_series_summary_prefixes,recs,selects)
+no_mig_plots[[1]][[length(no_mig_plots[[1]])+1]]<-plot_strain_freq_change(no_mig_longitudinal_outputs[[1]])
+no_mig_plots[[1]][[length(no_mig_plots[[1]])+1]]<-plot_diversity_over_time(no_mig_longitudinal_outputs[[2]])
 
 # save figures
 format_plots(no_mig_plots,"revised.multistrain_without_migration_")
@@ -1171,6 +1538,20 @@ weak_selection_time_series_prefixes<-c("/Users/nicholascroucher/Documents/evoMLN
 )
 weak_no_mig_plots[[1]][[length(weak_no_mig_plots[[1]])+1]]<-plot_time_series(weak_selection_time_series_prefixes)
 
+# time series summaries
+weak_time_series_summary_prefixes<-c(
+  "~/Documents/evoMLNFDS/rec_v_select/zero_time/time_series/rec_v_weak_select_no_mig.combined_sc.out",
+  "~/Documents/evoMLNFDS/rec_v_select/zero_time/time_series/rec_v_no_select_no_mig.combined_sc.out",
+  "~/Documents/evoMLNFDS/rec_v_select/zero_time/time_series/no_rec_v_weak_select_no_mig.combined_sc.out",
+  "~/Documents/evoMLNFDS/rec_v_select/zero_time/time_series/no_rec_v_no_select_no_mig.combined_sc.out",
+  "~/Documents/evoMLNFDS/rec_v_select/zero_time/time_series/sym_rec_v_weak_select_no_mig.combined_sc.out",
+  "~/Documents/evoMLNFDS/rec_v_select/zero_time/time_series/sym_rec_v_no_select_no_mig.combined_sc.out"
+)
+
+weak_longitudinal_outputs<-plot_through_time(weak_time_series_summary_prefixes,recs,selects)
+weak_no_mig_plots[[1]][[length(weak_no_mig_plots[[1]])+1]]<-plot_strain_freq_change(weak_longitudinal_outputs[[1]])
+weak_no_mig_plots[[1]][[length(weak_no_mig_plots[[1]])+1]]<-plot_diversity_over_time(weak_longitudinal_outputs[[2]])
+
 # save figures
 format_plots(weak_no_mig_plots,"revised.multistrain_with_weak_selection_without_migration_")
 
@@ -1189,46 +1570,31 @@ saltational_prefixes_no_mig<-c("~/Documents/evoMLNFDS/rec_v_select/zero_time/sal
 
 saltational_no_mig_plots<-process_simulation_data(prefixes=saltational_prefixes_no_mig,recs=recs,selects=selects,summaries=summaries,eq.loci=eq.loci,real.data=ma.data,snp.loci=snp.loci,snp.calc=TRUE,strain_slope=strain_divide_slope,strain_intercept=strain_divide_intercept,tip.anno=ma.tip.labels,real_strains=ma.strain.freqs)
 
+saltational_time_series_prefixes<-c("/Users/nicholascroucher/Documents/evoMLNFDS/rec_v_select/zero_time/time_series/saltational_rec_v_select_no_mig",
+                                    "/Users/nicholascroucher/Documents/evoMLNFDS/rec_v_select/zero_time/time_series/saltational_rec_v_no_select_no_mig",
+                                    "/Users/nicholascroucher/Documents/evoMLNFDS/rec_v_select/zero_time/time_series/no_rec_v_select_no_mig",
+                                    "/Users/nicholascroucher/Documents/evoMLNFDS/rec_v_select/zero_time/time_series/no_rec_v_no_select_no_mig",
+                                    "/Users/nicholascroucher/Documents/evoMLNFDS/rec_v_select/zero_time/time_series/saltational_sym_rec_v_select_no_mig",
+                                    "/Users/nicholascroucher/Documents/evoMLNFDS/rec_v_select/zero_time/time_series/saltational_sym_rec_v_no_select_no_mig"
+)
+saltational_no_mig_plots[[1]][[length(saltational_no_mig_plots[[1]])+1]]<-plot_time_series(saltational_time_series_prefixes)
+
+# time series summaries
+saltational_time_series_summary_prefixes<-c(
+  "~/Documents/evoMLNFDS/rec_v_select/zero_time/time_series/saltational_rec_v_select_no_mig.combined_sc.out",
+  "~/Documents/evoMLNFDS/rec_v_select/zero_time/time_series/saltational_rec_v_no_select_no_mig.combined_sc.out",
+  "~/Documents/evoMLNFDS/rec_v_select/zero_time/time_series/no_rec_v_select_no_mig.combined_sc.out",
+  "~/Documents/evoMLNFDS/rec_v_select/zero_time/time_series/no_rec_v_no_select_no_mig.combined_sc.out",
+  "~/Documents/evoMLNFDS/rec_v_select/zero_time/time_series/saltational_sym_rec_v_select_no_mig.combined_sc.out",
+  "~/Documents/evoMLNFDS/rec_v_select/zero_time/time_series/saltational_sym_rec_v_no_select_no_mig.combined_sc.out"
+)
+
+saltational_longitudinal_outputs<-plot_through_time(saltational_time_series_summary_prefixes,recs,selects)
+saltational_no_mig_plots[[1]][[length(saltational_no_mig_plots[[1]])+1]]<-plot_strain_freq_change(saltational_longitudinal_outputs[[1]])
+saltational_no_mig_plots[[1]][[length(saltational_no_mig_plots[[1]])+1]]<-plot_diversity_over_time(saltational_longitudinal_outputs[[2]])
+
 # save figures
 format_plots(saltational_no_mig_plots,"revised.multistrain_with_saltational_trans_without_migration_")
-
-##########################################
-# Plot changes in SC frequency over time #
-##########################################
-
-#recs<-c("Asymmetrical transformation","Asymmetrical transformation","No transformation","No transformation","Symmetrical transformation","Symmetrical transformation")
-#selects<-c("Multi-locus NFDS","Neutral","Multi-locus NFDS","Neutral","Multi-locus NFDS","Neutral")
-#summaries<-c("Asymmetrical transformation, NFDS","Asymmetrical transformation, neutral","No transformation, NFDS","No transformation, neutral","Symmetrical transformation, NFDS","Symmetrical transformation, neutral")
-
-no_mig_time_series_prefixes<-c("/Users/nicholascroucher/Documents/evoMLNFDS/rec_v_select/zero_time/time_series/rec_v_select_no_mig",
-                        "/Users/nicholascroucher/Documents/evoMLNFDS/rec_v_select/zero_time/time_series/rec_v_no_select_no_mig",
-                        "/Users/nicholascroucher/Documents/evoMLNFDS/rec_v_select/zero_time/time_series/no_rec_v_select_no_mig",
-                        "/Users/nicholascroucher/Documents/evoMLNFDS/rec_v_select/zero_time/time_series/no_rec_v_no_select_no_mig",
-                        "/Users/nicholascroucher/Documents/evoMLNFDS/rec_v_select/zero_time/time_series/sym_rec_v_select_no_mig",
-                        "/Users/nicholascroucher/Documents/evoMLNFDS/rec_v_select/zero_time/time_series/sym_rec_v_no_select_no_mig"
-)
-
-mig_time_series_prefixes<-c("/Users/nicholascroucher/Documents/evoMLNFDS/rec_v_select/zero_time/time_series/rec_v_select_mig",
-                               "/Users/nicholascroucher/Documents/evoMLNFDS/rec_v_select/zero_time/time_series/rec_v_no_select_mig",
-                               "/Users/nicholascroucher/Documents/evoMLNFDS/rec_v_select/zero_time/time_series/no_rec_v_select_mig",
-                               "/Users/nicholascroucher/Documents/evoMLNFDS/rec_v_select/zero_time/time_series/no_rec_v_no_select_mig",
-                               "/Users/nicholascroucher/Documents/evoMLNFDS/rec_v_select/zero_time/time_series/sym_rec_v_select_mig",
-                               "/Users/nicholascroucher/Documents/evoMLNFDS/rec_v_select/zero_time/time_series/sym_rec_v_no_select_mig"
-)
-
-saltational_time_series_prefixes<-c("/Users/nicholascroucher/Documents/evoMLNFDS/rec_v_select/zero_time/time_series/saltational_rec_v_select_no_mig",
-                            "/Users/nicholascroucher/Documents/evoMLNFDS/rec_v_select/zero_time/time_series/saltational_rec_v_no_select_no_mig",
-                            "/Users/nicholascroucher/Documents/evoMLNFDS/rec_v_select/zero_time/time_series/no_rec_v_select_no_mig",
-                            "/Users/nicholascroucher/Documents/evoMLNFDS/rec_v_select/zero_time/time_series/no_rec_v_no_select_no_mig",
-                            "/Users/nicholascroucher/Documents/evoMLNFDS/rec_v_select/zero_time/time_series/saltational_sym_rec_v_select_no_mig",
-                            "/Users/nicholascroucher/Documents/evoMLNFDS/rec_v_select/zero_time/time_series/saltational_sym_rec_v_no_select_no_mig"
-)
-
-
-
-no_mig_time_series_plot<-plot_time_series(no_mig_time_series_prefixes)
-with_markers_time_series_plot<-plot_time_series(mig_time_series_prefixes)
-saltational_time_series_plot<-plot_time_series(saltational_time_series_prefixes)
 
 ######################################
 # Run permutation tests on distances #
@@ -1291,3 +1657,57 @@ permutated_distances_plot<-ggplot(permuted_distances.df,aes(x=Distance)) +
   )
 
 ggsave(permutated_distances_plot,file=paste0("~/Documents/evoMLNFDS/rec_v_select/zero_time/figures/revised.distance_permutations_plot.png"),width = 15,height = 25, units="cm")
+
+######################################################
+# Plot gene frequency comparison with other datasets #
+######################################################
+
+make_comparison_plot<-function(fn,comp.df) {
+  in.df<-
+    read.table(file=fn, header = TRUE, comment.char = "") %>%
+    dplyr::select(-Time,-Serotype,-VT,-SC) %>%
+    tidyr::pivot_longer(cols = -Taxon, names_to = "Locus", values_to = "Allele") %>%
+    dplyr::filter(Locus %in% comp.df$Locus) %>%
+    dplyr::group_by(Locus) %>%
+    dplyr::summarise(AltFrequency = mean(Allele), .groups = "drop_last") %>%
+    dplyr::ungroup()
+  
+  comp.df %<>%
+    dplyr::inner_join(in.df, by = "Locus")
+  
+  comp_plot<-
+    ggplot(data = comp.df,
+           aes(x = MassachusettsFrequency, y = AltFrequency)) +
+      geom_point() +
+      stat_cor(aes(label = paste("rho ==",bquote(.(..r..)))),colour="black",label.x=0.05,label.y=0.9,hjust = 0,method="spearman",cor.coef.name="rho") +
+      theme_minimal()
+  
+  return(comp_plot)
+}
+
+mass.df<-
+  read.table(file="~/Documents/evoMLNFDS/rec_v_select/filtered.mass.input", header=TRUE, comment.char = "") %>%
+  dplyr::select(-Time,-Serotype,-VT,-SC) %>%
+  tidyr::pivot_longer(cols = -Taxon, names_to = "Locus", values_to = "Allele") %>%
+  dplyr::group_by(Locus) %>%
+  dplyr::summarise(MassachusettsFrequency = mean(Allele), .groups = "drop_last") %>%
+  dplyr::ungroup()
+
+mass.snp.df<-
+  read.table(file="~/Documents/evoMLNFDS/rec_v_select/filtered.mass.snp.input", header=TRUE, comment.char = "") %>%
+  dplyr::select(-Time,-Serotype,-VT,-SC) %>%
+  tidyr::pivot_longer(cols = -Taxon, names_to = "Locus", values_to = "Allele") %>%
+  dplyr::group_by(Locus) %>%
+  dplyr::summarise(MassachusettsFrequency = mean(Allele), .groups = "drop_last") %>%
+  dplyr::ungroup()
+
+soton_plot<-make_comparison_plot("~/Documents/frequencyDependence/FOR_PUB/input_files/southampton.input",mass.df)
+maela_plot<-make_comparison_plot("~/Documents/frequencyDependence/FOR_PUB/input_files/maela.input",mass.df)
+
+soton_snp_plot<-make_comparison_plot("~/Documents/frequencyDependence/FOR_PUB/input_files/southampton.snp.input",mass.snp.df)
+maela_snp_plot<-make_comparison_plot("~/Documents/frequencyDependence/FOR_PUB/input_files/maela.snp.input",mass.snp.df)
+
+cowplot::plot_grid(plotlist = list(soton_plot,maela_plot,soton_snp_plot,maela_snp_plot),
+                   ncol = 2,
+                   nrow = 2,
+                   labels = "auto")
