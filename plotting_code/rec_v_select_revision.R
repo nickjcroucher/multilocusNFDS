@@ -16,6 +16,8 @@ library(ggpubr)
 library(propagate)
 library(vegan)
 library(magrittr)
+library(ggrastr)
+library(quantileDA) # skewness alternatives
 #library(pracma)
 #library(pdist)
 
@@ -515,7 +517,8 @@ getDistStats<-function(in.dist,varname) {
   summary_formula<-as.formula(paste0(varname,"~Recombination+Selection"))
   kurtosis.df<-aggregate(summary_formula,data=in.dist,propagate::kurtosis)
   colnames(kurtosis.df)[ncol(kurtosis.df)]<-"Kurtosis"
-  skewness.df<-aggregate(summary_formula,data=in.dist,propagate::skewness)
+  #skewness.df<-aggregate(summary_formula,data=in.dist,propagate::skewness)
+  skewness.df<-aggregate(summary_formula,data=in.dist,quantileDA::kelleyskew)
   colnames(skewness.df)[ncol(skewness.df)]<-"Skewness"
   mean.df<-aggregate(summary_formula,data=in.dist,mean)
   colnames(mean.df)[ncol(mean.df)]<-"Mean"
@@ -692,7 +695,7 @@ process_simulation_data<-function(prefixes=NULL,recs=NULL,selects=NULL,summaries
     xlab("Proportion of loci in genome")+
     ylab("Density")+
     geom_density(data=genome_sizes, aes(x=Sizes), col = my_line_col, trim=TRUE)+
-    geom_text(data=genotype.summary.df,x=default_x,y=default_y,hjust=0,size=my_geom_text_size,aes(label=sprintf("Mean: %.2f\nVariance: %.2g\nSkewness: %.2f\n",Mean,Variance,Skewness)))
+    geom_text(data=genotype.summary.df,x=default_x,y=default_y,hjust=0,size=my_geom_text_size,aes(label=sprintf("Mean: %.2f\nVariance: %.2g\nSkewness: %.3f\n",Mean,Variance,Skewness)))
   out_plots[[2]]<-genome_plot
 
   # plot pairwise distances
@@ -703,7 +706,7 @@ process_simulation_data<-function(prefixes=NULL,recs=NULL,selects=NULL,summaries
     ylab("Density (log(density+1) scale)")+
     geom_density(data=genome_distances, aes(x=Distances, y=..scaled..), col = my_line_col, trim=TRUE)+
     scale_y_continuous(trans="log1p")+
-    geom_text(data=dist.summary.df,x=0.0,y=0.6,hjust=0,size=my_geom_text_size,aes(label=sprintf("Mean: %.2f\nVariance: %.2g\nSkewness: %.2f\n",Mean,Variance,Skewness)))
+    geom_text(data=dist.summary.df,x=0.0,y=0.6,hjust=0,size=my_geom_text_size,aes(label=sprintf("Mean: %.2f\nVariance: %.2g\nSkewness: %.3f\n",Mean,Variance,Skewness)))
   out_plots[[3]]<-distance_plot
 
   # plot distances to real data
@@ -739,7 +742,7 @@ process_simulation_data<-function(prefixes=NULL,recs=NULL,selects=NULL,summaries
       ylab("Density (log(density+1) scale)")+
       geom_density(data=genome_distances, aes(x=SNPDistances, y=..scaled..), col = my_line_col, trim=TRUE)+
       scale_y_continuous(trans="log1p")+
-      geom_text(data=snp.dist.summary.df,x=0.0,y=0.6,hjust=0,size=my_geom_text_size,aes(label=sprintf("Mean: %.2f\nVariance: %.3g\nSkewness: %.2f\n",Mean,Variance,Skewness)))
+      geom_text(data=snp.dist.summary.df,x=0.0,y=0.6,hjust=0,size=my_geom_text_size,aes(label=sprintf("Mean: %.2f\nVariance: %.3g\nSkewness: %.3f\n",Mean,Variance,Skewness)))
     out_plots[[6]]<-snp_distance_plot
     
     # plot SNP v accessory distances
@@ -750,7 +753,7 @@ process_simulation_data<-function(prefixes=NULL,recs=NULL,selects=NULL,summaries
       dplyr::mutate(PropWithin = sum(WithinStrain)/n()) %>%
       dplyr::ungroup()
     # text position
-    default_x_prop<-0.30
+    default_x_prop<-0.32
     default_x_corr<-default_x_prop*0.9
     default_y_corr<-0.16
     default_y_prop<-0.32
@@ -773,18 +776,29 @@ process_simulation_data<-function(prefixes=NULL,recs=NULL,selects=NULL,summaries
     # then plot
     comparison_distance_plot<-
       ggplot(data=snp.dist.df,aes(x=SNPDistances,y=Distances))+
-      geom_point(alpha = 5000/nrow(snp.dist.df),size=0.5)+
-      facet_grid(Recombination~Selection)+
       xlab("Pairwise Hamming SNP distances between genomes")+
       ylab("Pairwise binary Jaccard distances between genomes")+
+      rasterise(geom_point(alpha = 5000/nrow(snp.dist.df),size=0.5), dpi = 600)+
+      #geom_point_rast(alpha = 5000/nrow(snp.dist.df),size=0.5) +
       geom_abline(colour=my_line_col, slope = strain_slope, intercept = strain_intercept, alpha=0.5, linetype = 2)+
       geom_density_2d(data=genome_distances[genome_distances$Distances>=(strain_intercept+strain_slope*genome_distances$SNPDistances),], aes(x=SNPDistances, y=Distances), colour = pal_npg()(2)[2], alpha = 0.5,size=0.5)+
       geom_density_2d(data=genome_distances[genome_distances$Distances<(strain_intercept+strain_slope*genome_distances$SNPDistances),], aes(x=SNPDistances, y=Distances), colour = my_fill_high, alpha = 0.5,size=0.5) +
+      facet_grid(Recombination~Selection)+
       stat_cor(aes(label = paste("rho ==",bquote(.(..r..)))),colour="black",label.x=default_x_corr,label.y=default_y_corr,hjust = 0,method="spearman",cor.coef.name="rho") +
       geom_text(data = snp.dist.df %>% dplyr::select(Recombination,Selection,PropWithin) %>% dplyr::distinct(),
                 aes(label = sprintf("Within strain\nproportion:  %.2f",PropWithin)),
                 x = default_x_prop,
-                y = default_y_prop)
+                y = default_y_prop) +
+      theme_minimal() +
+      theme(plot.margin = unit(c(0,0,0,0), "cm"),
+            panel.spacing = unit(0, "cm"),
+            panel.border = element_rect(color = "black", fill = NA, size = 0.25),
+            axis.text.x = element_text(size = 8, angle = 90, hjust = 1),
+            axis.text.y = element_text(size = 8),
+            axis.title.x = element_text(size = 10, face = "bold"),
+            axis.title.y = element_text(size = 10, face = "bold"),
+            strip.text.x = element_text(size = my_facet_label_size),
+            strip.text.y = element_text(size = my_facet_label_size))
     out_plots[[7]]<-comparison_distance_plot
     
     # plot trees
@@ -859,7 +873,7 @@ process_simulation_data<-function(prefixes=NULL,recs=NULL,selects=NULL,summaries
 }
 
 # format graphs for publication
-format_plots<-function(raw_plot_list,prefix="test") {
+format_plots<-function(raw_plot_list,prefix="test",suffix="png") {
   
   # scale function
   scaleFUN <- function(x) sprintf("%.2f", x)
@@ -887,7 +901,7 @@ format_plots<-function(raw_plot_list,prefix="test") {
                                             strip.text.y = element_text(size = my_facet_label_size),
                                             legend.position="bottom"),
   nrow=1,ncol=2,labels=c("a","b"),label.args = list(gp=grid::gpar(fontface = "bold")))
-  ggsave(freq_plots, file=paste0("~/Documents/evoMLNFDS/rec_v_select/zero_time/figures/",prefix,"_freq_plot.png"), width = 21, height = 21, units="cm")
+  ggsave(freq_plots, file=paste0("~/Documents/evoMLNFDS/rec_v_select/zero_time/figures/",prefix,"_freq_plot.",suffix), width = 21, height = 21, units="cm")
   # genome sizes
   size_plots<-ggarrange(raw_plot_list[[1]][[2]]+theme_minimal()+theme(plot.margin = unit(c(0,0,0,0), "cm"),
                                                                   panel.spacing = unit(0, "cm"),
@@ -898,7 +912,7 @@ format_plots<-function(raw_plot_list,prefix="test") {
                                                                   axis.title.y = element_text(size = 10, face = "bold"),
                                                                   strip.text.x = element_text(size = my_facet_label_size),
                                                                   strip.text.y = element_text(size = my_facet_label_size)))
-  ggsave(size_plots,file=paste0("~/Documents/evoMLNFDS/rec_v_select/zero_time/figures/",prefix,"size_plot.png"),width = 15,height = 17.5, units="cm")
+  ggsave(size_plots,file=paste0("~/Documents/evoMLNFDS/rec_v_select/zero_time/figures/",prefix,"size_plot.",suffix),width = 15,height = 17.5, units="cm")
   # distance plots
   dist_plots<-egg::ggarrange(raw_plot_list[[1]][[3]]+ scale_x_continuous(labels=scaleFUN)+theme_minimal()+theme(plot.margin = unit(c(0,0,0,0), "cm"),
                                                                                                             panel.spacing = unit(0, "cm"),
@@ -921,7 +935,7 @@ format_plots<-function(raw_plot_list,prefix="test") {
                                                                                                             strip.text.y = element_text(size = my_facet_label_size),
                                                                                                             legend.position="none"),
                              nrow=1,ncol=2,labels=c("a","b"),label.args = list(gp=grid::gpar(fontface = "bold")))
-  ggsave(dist_plots,file=paste0("~/Documents/evoMLNFDS/rec_v_select/zero_time/figures/",prefix,"dist_plot.png"),width = 21,height = 21, units="cm")
+  ggsave(dist_plots,file=paste0("~/Documents/evoMLNFDS/rec_v_select/zero_time/figures/",prefix,"dist_plot.",suffix),width = 21,height = 21, units="cm")
   # tree plots
   tree_plots<-ggpubr::ggarrange(raw_plot_list[[1]][[10]]+theme_minimal()+theme(legend.position = "bottom",aspect.ratio=2,
                                                                                axis.line.x = element_line(color="black", size = 0.25, linetype='solid'),
@@ -931,18 +945,10 @@ format_plots<-function(raw_plot_list,prefix="test") {
                                                                               )+panel_border(remove=FALSE)+guides(colour=guide_legend(title.position="top",title.hjust =0.5)),
                         raw_plot_list[[1]][[8]]+theme(aspect.ratio=2)+panel_border(remove=TRUE),
                         labels = "auto",common.legend=TRUE,legend="bottom")
-  ggsave(tree_plots,file=paste0("~/Documents/evoMLNFDS/rec_v_select/zero_time/figures/",prefix,"tree_plot.png"), width = 21, height = 21, units="cm")
+  ggsave(tree_plots,file=paste0("~/Documents/evoMLNFDS/rec_v_select/zero_time/figures/",prefix,"tree_plot.",suffix), width = 21, height = 21, units="cm")
   # pairwise distance plots
-  pairwise_plot<-ggarrange(raw_plot_list[[1]][[7]]+theme_minimal()+theme(plot.margin = unit(c(0,0,0,0), "cm"),
-                                                                     panel.spacing = unit(0, "cm"),
-                                                                     panel.border = element_rect(color = "black", fill = NA, size = 0.25),
-                                                                     axis.text.x = element_text(size = 8, angle = 90, hjust = 1),
-                                                                     axis.text.y = element_text(size = 8),
-                                                                     axis.title.x = element_text(size = 10, face = "bold"),
-                                                                     axis.title.y = element_text(size = 10, face = "bold"),
-                                                                     strip.text.x = element_text(size = my_facet_label_size),
-                                                                     strip.text.y = element_text(size = my_facet_label_size)))
-  ggsave(pairwise_plot,file=paste0("~/Documents/evoMLNFDS/rec_v_select/zero_time/figures/",prefix,"pairwise_plot.png"),width = 15,height = 17.5, units="cm")
+  pairwise_plot<-ggarrange(raw_plot_list[[1]][[7]])#+theme_minimal())
+  ggsave(pairwise_plot,file=paste0("~/Documents/evoMLNFDS/rec_v_select/zero_time/figures/",prefix,"pairwise_plot.",suffix),width = 15,height = 17.5, units="cm")
   # strain frequency plots
   freq_plot<-ggarrange(raw_plot_list[[1]][[9]]+theme_minimal()+theme(plot.margin = unit(c(0,0,0,0), "cm"),
                                                                  panel.spacing = unit(0, "cm"),
@@ -953,7 +959,7 @@ format_plots<-function(raw_plot_list,prefix="test") {
                                                                  axis.title.y = element_text(size = 10, face = "bold"),
                                                                  strip.text.x = element_text(size = my_facet_label_size),
                                                                  strip.text.y = element_text(size = my_facet_label_size)))
-  ggsave(freq_plot,file=paste0("~/Documents/evoMLNFDS/rec_v_select/zero_time/figures/",prefix,"freq_plot.png"),width = 15,height = 17.5, units="cm")
+  ggsave(freq_plot,file=paste0("~/Documents/evoMLNFDS/rec_v_select/zero_time/figures/",prefix,"freq_plot.",suffix),width = 15,height = 17.5, units="cm")
   
   # divergence plots
   div_plot<-ggarrange(raw_plot_list[[1]][[4]]+theme_minimal()+theme(plot.margin = unit(c(0,0,0,0), "cm"),
@@ -965,7 +971,7 @@ format_plots<-function(raw_plot_list,prefix="test") {
                                                                 axis.title.y = element_text(size = 10, face = "bold"),
                                                                 strip.text.x = element_text(size = my_facet_label_size),
                                                                 strip.text.y = element_text(size = my_facet_label_size)))
-  ggsave(div_plot,file=paste0("~/Documents/evoMLNFDS/rec_v_select/zero_time/figures/",prefix,"divergence_plot_test.png"),width = 15,height = 17.5, units="cm")
+  ggsave(div_plot,file=paste0("~/Documents/evoMLNFDS/rec_v_select/zero_time/figures/",prefix,"divergence_plot_test.",suffix),width = 15,height = 17.5, units="cm")
   
   # genome size comparison
   gsize_comp_plot<-raw_plot_list[[1]][[11]]+theme_minimal()+theme(plot.margin = unit(c(0,0,0,0), "cm"),
@@ -980,7 +986,7 @@ format_plots<-function(raw_plot_list,prefix="test") {
                                                  legend.text = element_text(size = 7),
                                                  legend.position = "bottom",
                                                  legend.title = element_blank())
-  ggsave(gsize_comp_plot,file=paste0("~/Documents/evoMLNFDS/rec_v_select/zero_time/figures/",prefix,"gsize_comp_plot.png"),width = 15,height = 17.5, units="cm")
+  ggsave(gsize_comp_plot,file=paste0("~/Documents/evoMLNFDS/rec_v_select/zero_time/figures/",prefix,"gsize_comp_plot.",suffix),width = 15,height = 17.5, units="cm")
   
   # compare pairwise accessory distances
   accdist_comp_plot<-raw_plot_list[[1]][[12]]+theme_minimal()+theme(plot.margin = unit(c(0,0,0,0), "cm"),
@@ -995,7 +1001,7 @@ format_plots<-function(raw_plot_list,prefix="test") {
                                                                   legend.text = element_text(size = 7),
                                                                   legend.position = "bottom",
                                                                   legend.title = element_blank())
-  ggsave(accdist_comp_plot,file=paste0("~/Documents/evoMLNFDS/rec_v_select/zero_time/figures/",prefix,"accdist_comp_plot.png"),width = 15,height = 17.5, units="cm")
+  ggsave(accdist_comp_plot,file=paste0("~/Documents/evoMLNFDS/rec_v_select/zero_time/figures/",prefix,"accdist_comp_plot.",suffix),width = 15,height = 17.5, units="cm")
   
   # compare pairwise SNP distances
   snpdist_comp_plot<-raw_plot_list[[1]][[13]]+theme_minimal()+theme(plot.margin = unit(c(0,0,0,0), "cm"),
@@ -1010,11 +1016,11 @@ format_plots<-function(raw_plot_list,prefix="test") {
                                                                     legend.text = element_text(size = 7),
                                                                     legend.position = "bottom",
                                                                     legend.title = element_blank())
-  ggsave(snpdist_comp_plot,file=paste0("~/Documents/evoMLNFDS/rec_v_select/zero_time/figures/",prefix,"snpdist_comp_plot.png"),width = 15,height = 17.5, units="cm")
+  ggsave(snpdist_comp_plot,file=paste0("~/Documents/evoMLNFDS/rec_v_select/zero_time/figures/",prefix,"snpdist_comp_plot.",suffix),width = 15,height = 17.5, units="cm")
   # plot timeseries
-  ggsave(raw_plot_list[[1]][[14]],file=paste0("~/Documents/evoMLNFDS/rec_v_select/zero_time/figures/",prefix,"timeseries_example_plot.png"),width = 15,height = 17.5, units="cm")
-  ggsave(raw_plot_list[[1]][[15]],file=paste0("~/Documents/evoMLNFDS/rec_v_select/zero_time/figures/",prefix,"strain_freq_change_plot.png"),width = 15,height = 17.5, units="cm")
-  ggsave(raw_plot_list[[1]][[16]],file=paste0("~/Documents/evoMLNFDS/rec_v_select/zero_time/figures/",prefix,"diversity_change_plot.png"),width = 15,height = 17.5, units="cm")
+  ggsave(raw_plot_list[[1]][[14]],file=paste0("~/Documents/evoMLNFDS/rec_v_select/zero_time/figures/",prefix,"timeseries_example_plot.",suffix),width = 15,height = 17.5, units="cm")
+  ggsave(raw_plot_list[[1]][[15]],file=paste0("~/Documents/evoMLNFDS/rec_v_select/zero_time/figures/",prefix,"strain_freq_change_plot.",suffix),width = 15,height = 17.5, units="cm")
+  ggsave(raw_plot_list[[1]][[16]],file=paste0("~/Documents/evoMLNFDS/rec_v_select/zero_time/figures/",prefix,"diversity_change_plot.",suffix),width = 15,height = 17.5, units="cm")
 }
 
 plot_simulation_comparison<-function(sims,actual,vals_colname="Frequency") {
@@ -1114,7 +1120,6 @@ tree_pal[3]<-"#6A0DAD"
 new_tree_pal<-c(tree_pal[c(1,3,5)],tree_pal[c(2,4,6)],"#000000")
 new_tree_shapes<-c(1,2,4,1,2,4,19)
 
-
 # read input data
 eq.loci<-read.table(file="~/Documents/evoMLNFDS/rec_v_select/mass.locusFreq")
 colnames(eq.loci)<-c("Locus","Frequency")
@@ -1186,19 +1191,16 @@ genome_distances %<>%
   dplyr::mutate(WithinStrain = (Distances<(strain_divide_intercept+strain_divide_slope*SNPDistances))) %>%
   dplyr::mutate(PropWithin = sum(WithinStrain)/n())
 
-ma.dists<-ggplot(genome_distances,aes(x=SNPDistances,y=Distances))+geom_point(alpha = 5000/nrow(genome_distances),size=0.5)+
-  geom_abline(colour=my_line_col, slope = strain_divide_slope, intercept = strain_divide_intercept, alpha=0.5, linetype = 2)+
+ma.dists<-ggplot(genome_distances,aes(x=SNPDistances,y=Distances))+
   xlab("Pairwise Hamming SNP distances between genomes")+
   ylab("Pairwise binary Jaccard distances between genomes")+
   #stat_cor(aes(label = paste("tau ==",bquote(.(..r..)))),colour="black",label.x=0.29,label.y=0.2,hjust = 0,method="kendall",cor.coef.name="tau")+
-  stat_cor(aes(label = paste("rho ==",bquote(.(..r..)))),colour="black",label.x=0.27,label.y=0.16,hjust = 0,method="spearman",cor.coef.name="rho")+
-  geom_density_2d(data=genome_distances[genome_distances$Distances>=(strain_divide_intercept+strain_divide_slope*genome_distances$SNPDistances),], aes(x=SNPDistances, y=Distances), colour = pal_npg()(2)[2], alpha = 0.5, size = 0.5)+
-  geom_density_2d(data=genome_distances[genome_distances$Distances<(strain_divide_intercept+strain_divide_slope*genome_distances$SNPDistances),], aes(x=SNPDistances, y=Distances), colour = my_fill_high, alpha = 0.5, size = 0.5)+
+  stat_cor(aes(label = paste("rho ==",bquote(.(..r..)))),colour="black",label.x=0.29,label.y=0.2,hjust = 0,method="spearman",cor.coef.name="rho")+
   #geom_density_2d(data=genome_distances %>% dplyr::filter(!WithinStrain), aes(x=SNPDistances, y=Distances), colour = pal_npg()(2)[2], alpha = 0.5, size = 0.5)+
   #geom_density_2d(data=genome_distances %>% dplyr::filter(WithinStrain), aes(x=SNPDistances, y=Distances), colour = my_fill_high, alpha = 0.5, size = 0.5)+
   geom_text(data = genome_distances %>% dplyr::select(PropWithin) %>% dplyr::distinct(),
             aes(label = sprintf("Within strain\nproportion:  %.2f",PropWithin)),
-            x = 0.30,
+            x = 0.32,
             y = 0.32) +
   theme_minimal()+theme(plot.margin = unit(c(0,0,0,0), "cm"),
                          panel.spacing = unit(0, "cm"),
@@ -1208,7 +1210,12 @@ ma.dists<-ggplot(genome_distances,aes(x=SNPDistances,y=Distances))+geom_point(al
                          axis.title.x = element_text(size = 8, face = "bold"),
                          axis.title.y = element_text(size = 8, face = "bold"),
                          strip.text.x = element_text(size = my_facet_label_size),
-                         strip.text.y = element_text(size = my_facet_label_size))
+                         strip.text.y = element_text(size = my_facet_label_size)) +
+  rasterise(geom_point(alpha = 5000/nrow(genome_distances),size=0.5), dpi = 1200) +
+  geom_abline(colour=my_line_col, slope = strain_divide_slope, intercept = strain_divide_intercept, alpha=0.5, linetype = 2) +
+  geom_density_2d(data=genome_distances[genome_distances$Distances>=(strain_divide_intercept+strain_divide_slope*genome_distances$SNPDistances),], aes(x=SNPDistances, y=Distances), colour = pal_npg()(2)[2], alpha = 0.5, size = 0.5)+
+  geom_density_2d(data=genome_distances[genome_distances$Distances<(strain_divide_intercept+strain_divide_slope*genome_distances$SNPDistances),], aes(x=SNPDistances, y=Distances), colour = my_fill_high, alpha = 0.5, size = 0.5)
+  
 ggsave(ma.dists,file="~/Documents/evoMLNFDS/rec_v_select/zero_time/figures/revised.ma_dists.png",height=8.5,width=8.5,units = "cm")
 
 # calculate distance distribution statistics
@@ -1267,47 +1274,6 @@ nomge.ma.dists<-ggplot(nomge_genome_distances,aes(x=SNPDistances,y=Distances))+g
 
 ggsave(nomge.ma.dists,file="~/Documents/evoMLNFDS/rec_v_select/zero_time/figures/revised.nomge.ma_dists.png",height=20,width=20,units = "cm")
 
-###############
-# Weak subset #
-###############
-
-# analysis with markers
-subset_weak_prefixes<-c("/Users/nicholascroucher/Documents/evoMLNFDS/rec_v_select/subset_inputs/rec_v_weak_select_no_mig/rec_v_weak_select_no_mig",
-                        "/Users/nicholascroucher/Documents/evoMLNFDS/rec_v_select/subset_inputs/rec_v_no_select_no_mig/rec_v_no_select_no_mig",
-                        "/Users/nicholascroucher/Documents/evoMLNFDS/rec_v_select/subset_inputs/no_rec_v_weak_select_no_mig/no_rec_v_weak_select_no_mig",
-                        "/Users/nicholascroucher/Documents/evoMLNFDS/rec_v_select/subset_inputs/no_rec_v_no_select_no_mig/no_rec_v_no_select_no_mig",
-                        "/Users/nicholascroucher/Documents/evoMLNFDS/rec_v_select/subset_inputs/sym_rec_v_weak_select_no_mig/sym_rec_v_weak_select_no_mig",
-                        "/Users/nicholascroucher/Documents/evoMLNFDS/rec_v_select/subset_inputs/sym_rec_v_no_select_no_mig/sym_rec_v_no_select_no_mig"
-)
-
-subset_weak_plots<-process_simulation_data(prefixes=subset_weak_prefixes,recs=recs,selects=selects,summaries=summaries,eq.loci=eq.loci,real.data=ma.data,snp.loci=snp.loci,snp.calc=TRUE,strain_slope=strain_divide_slope,strain_intercept=strain_divide_intercept,tip.anno=ma.tip.labels,real_strains=ma.strain.freqs,tree_data=ma.tree.stats)
-
-subset_weak_time_series_prefixes<-c("/Users/nicholascroucher/Documents/evoMLNFDS/rec_v_select/zero_time/time_series/subset.rec_v_weak_select_no_mig",
-                                    "/Users/nicholascroucher/Documents/evoMLNFDS/rec_v_select/zero_time/time_series/subset.rec_v_no_select_no_mig",
-                                    "/Users/nicholascroucher/Documents/evoMLNFDS/rec_v_select/zero_time/time_series/subset.no_rec_v_weak_select_no_mig",
-                                    "/Users/nicholascroucher/Documents/evoMLNFDS/rec_v_select/zero_time/time_series/subset.no_rec_v_no_select_no_mig",
-                                    "/Users/nicholascroucher/Documents/evoMLNFDS/rec_v_select/zero_time/time_series/subset.sym_rec_v_weak_select_no_mig",
-                                    "/Users/nicholascroucher/Documents/evoMLNFDS/rec_v_select/zero_time/time_series/subset.sym_rec_v_no_select_no_mig"
-)
-subset_weak_plots[[1]][[length(subset_weak_plots[[1]])+1]]<-plot_time_series(subset_weak_time_series_prefixes)
-
-# time series summaries
-subset_weak_time_series_summary_prefixes<-c(
-  "~/Documents/evoMLNFDS/rec_v_select/zero_time/time_series/subset.rec_v_weak_select_no_mig.combined_sc.out",
-  "~/Documents/evoMLNFDS/rec_v_select/zero_time/time_series/subset.rec_v_no_select_no_mig.combined_sc.out",
-  "~/Documents/evoMLNFDS/rec_v_select/zero_time/time_series/subset.no_rec_v_weak_select_no_mig.combined_sc.out",
-  "~/Documents/evoMLNFDS/rec_v_select/zero_time/time_series/subset.no_rec_v_no_select_no_mig.combined_sc.out",
-  "~/Documents/evoMLNFDS/rec_v_select/zero_time/time_series/subset.sym_rec_v_weak_select_no_mig.combined_sc.out",
-  "~/Documents/evoMLNFDS/rec_v_select/zero_time/time_series/subset.sym_rec_v_no_select_no_mig.combined_sc.out"
-)
-
-subset_weak_longitudinal_outputs<-plot_through_time(subset_weak_time_series_summary_prefixes,recs,selects)
-subset_weak_plots[[1]][[length(subset_weak_plots[[1]])+1]]<-plot_strain_freq_change(subset_weak_longitudinal_outputs[[1]])
-subset_weak_plots[[1]][[length(subset_weak_plots[[1]])+1]]<-plot_diversity_over_time(subset_weak_longitudinal_outputs[[2]])
-
-# save figures
-format_plots(subset_weak_plots,"revised.subset_weak_genotypes_")
-
 ##############
 # Randomised #
 ##############
@@ -1348,6 +1314,11 @@ randomised_plots[[1]][[length(randomised_plots[[1]])+1]]<-plot_diversity_over_ti
 
 # save figures
 format_plots(randomised_plots,"revised.randomised_genotypes_")
+
+# additional
+prefix<-"revised.randomised_genotypes_"
+time_output_plot<-plot_grid(plotlist = list(randomised_plots[[1]][[14]],randomised_plots[[1]][[16]]),ncol=2,labels="auto")
+ggsave(time_output_plot,file=paste0("~/Documents/evoMLNFDS/rec_v_select/zero_time/figures/",prefix,"timeseries_comparison_plot.png"),width = 15,height = 17.5, units="cm")
 
 ############
 # Permuted #
@@ -1390,6 +1361,11 @@ permuted_plots[[1]][[length(permuted_plots[[1]])+1]]<-plot_diversity_over_time(p
 # save figures
 format_plots(permuted_plots,"revised.permuted_genotypes_")
 
+# additional
+prefix<-"revised.permuted_genotypes_"
+time_output_plot<-plot_grid(plotlist = list(permuted_plots[[1]][[14]],permuted_plots[[1]][[16]]),ncol=2,labels = "auto")
+ggsave(time_output_plot,file=paste0("~/Documents/evoMLNFDS/rec_v_select/zero_time/figures/",prefix,"timeseries_comparison_plot.png"),width = 15,height = 17.5, units="cm")
+
 ##########
 # Subset #
 ##########
@@ -1430,6 +1406,11 @@ subset_plots[[1]][[length(subset_plots[[1]])+1]]<-plot_diversity_over_time(subse
 
 # save figures
 format_plots(subset_plots,"revised.subset_genotypes_")
+
+# additional
+prefix<-"revised.subset_genotypes_"
+time_output_plot<-plot_grid(plotlist = list(subset_plots[[1]][[14]],subset_plots[[1]][[16]]),ncol=2,labels = "auto")
+ggsave(time_output_plot,file=paste0("~/Documents/evoMLNFDS/rec_v_select/zero_time/figures/",prefix,"timeseries_comparison_plot.png"),width = 15,height = 17.5, units="cm")
 
 #############
 # Migration #
@@ -1472,6 +1453,11 @@ marker_plots[[1]][[length(marker_plots[[1]])+1]]<-plot_diversity_over_time(marke
 # save figures
 format_plots(marker_plots,"revised.multistrain_with_migration_")
 
+# additional
+prefix<-"revised.multistrain_with_migration_"
+time_output_plot<-plot_grid(plotlist = list(marker_plots[[1]][[14]],marker_plots[[1]][[16]]),ncol=2,labels = "auto")
+ggsave(time_output_plot,file=paste0("~/Documents/evoMLNFDS/rec_v_select/zero_time/figures/",prefix,"timeseries_comparison_plot.png"),width = 15,height = 17.5, units="cm")
+
 ################
 # No migration #
 ################
@@ -1512,7 +1498,12 @@ no_mig_plots[[1]][[length(no_mig_plots[[1]])+1]]<-plot_strain_freq_change(no_mig
 no_mig_plots[[1]][[length(no_mig_plots[[1]])+1]]<-plot_diversity_over_time(no_mig_longitudinal_outputs[[2]])
 
 # save figures
-format_plots(no_mig_plots,"revised.multistrain_without_migration_")
+format_plots(no_mig_plots,"revised.multistrain_without_migration_",suffix = "pdf")
+
+# additional
+prefix<-"revised.multistrain_without_migration_"
+time_output_plot<-plot_grid(plotlist = list(no_mig_plots[[1]][[14]],no_mig_plots[[1]][[16]]),ncol=2,labels = "auto")
+ggsave(time_output_plot,file=paste0("~/Documents/evoMLNFDS/rec_v_select/zero_time/figures/",prefix,"timeseries_comparison_plot.png"),width = 15,height = 17.5, units="cm")
 
 #############
 # Weak NFDS #
@@ -1555,6 +1546,11 @@ weak_no_mig_plots[[1]][[length(weak_no_mig_plots[[1]])+1]]<-plot_diversity_over_
 # save figures
 format_plots(weak_no_mig_plots,"revised.multistrain_with_weak_selection_without_migration_")
 
+# additional
+prefix<-"revised.multistrain_with_weak_selection_without_migration_"
+time_output_plot<-plot_grid(plotlist = list(weak_no_mig_plots[[1]][[14]],weak_no_mig_plots[[1]][[16]]),ncol=2,labels = "auto")
+ggsave(time_output_plot,file=paste0("~/Documents/evoMLNFDS/rec_v_select/zero_time/figures/",prefix,"timeseries_comparison_plot.png"),width = 15,height = 17.5, units="cm")
+
 ###############
 # Saltational #
 ###############
@@ -1595,6 +1591,58 @@ saltational_no_mig_plots[[1]][[length(saltational_no_mig_plots[[1]])+1]]<-plot_d
 
 # save figures
 format_plots(saltational_no_mig_plots,"revised.multistrain_with_saltational_trans_without_migration_")
+
+# additional
+prefix<-"revised.multistrain_with_saltational_trans_without_migration_"
+time_output_plot<-plot_grid(plotlist = list(saltational_no_mig_plots[[1]][[14]],saltational_no_mig_plots[[1]][[16]]),ncol=2,labels = "auto")
+ggsave(time_output_plot,file=paste0("~/Documents/evoMLNFDS/rec_v_select/zero_time/figures/",prefix,"timeseries_comparison_plot.png"),width = 15,height = 17.5, units="cm")
+
+
+###############
+# Weak subset #
+###############
+
+# analysis with markers
+subset_weak_prefixes<-c("/Users/nicholascroucher/Documents/evoMLNFDS/rec_v_select/subset_inputs/rec_v_weak_select_no_mig/rec_v_weak_select_no_mig",
+                        "/Users/nicholascroucher/Documents/evoMLNFDS/rec_v_select/subset_inputs/rec_v_no_select_no_mig/rec_v_no_select_no_mig",
+                        "/Users/nicholascroucher/Documents/evoMLNFDS/rec_v_select/subset_inputs/no_rec_v_weak_select_no_mig/no_rec_v_weak_select_no_mig",
+                        "/Users/nicholascroucher/Documents/evoMLNFDS/rec_v_select/subset_inputs/no_rec_v_no_select_no_mig/no_rec_v_no_select_no_mig",
+                        "/Users/nicholascroucher/Documents/evoMLNFDS/rec_v_select/subset_inputs/sym_rec_v_weak_select_no_mig/sym_rec_v_weak_select_no_mig",
+                        "/Users/nicholascroucher/Documents/evoMLNFDS/rec_v_select/subset_inputs/sym_rec_v_no_select_no_mig/sym_rec_v_no_select_no_mig"
+)
+
+subset_weak_plots<-process_simulation_data(prefixes=subset_weak_prefixes,recs=recs,selects=selects,summaries=summaries,eq.loci=eq.loci,real.data=ma.data,snp.loci=snp.loci,snp.calc=TRUE,strain_slope=strain_divide_slope,strain_intercept=strain_divide_intercept,tip.anno=ma.tip.labels,real_strains=ma.strain.freqs,tree_data=ma.tree.stats)
+
+subset_weak_time_series_prefixes<-c("/Users/nicholascroucher/Documents/evoMLNFDS/rec_v_select/zero_time/time_series/subset.rec_v_weak_select_no_mig",
+                                    "/Users/nicholascroucher/Documents/evoMLNFDS/rec_v_select/zero_time/time_series/subset.rec_v_no_select_no_mig",
+                                    "/Users/nicholascroucher/Documents/evoMLNFDS/rec_v_select/zero_time/time_series/subset.no_rec_v_weak_select_no_mig",
+                                    "/Users/nicholascroucher/Documents/evoMLNFDS/rec_v_select/zero_time/time_series/subset.no_rec_v_no_select_no_mig",
+                                    "/Users/nicholascroucher/Documents/evoMLNFDS/rec_v_select/zero_time/time_series/subset.sym_rec_v_weak_select_no_mig",
+                                    "/Users/nicholascroucher/Documents/evoMLNFDS/rec_v_select/zero_time/time_series/subset.sym_rec_v_no_select_no_mig"
+)
+subset_weak_plots[[1]][[length(subset_weak_plots[[1]])+1]]<-plot_time_series(subset_weak_time_series_prefixes)
+
+# time series summaries
+subset_weak_time_series_summary_prefixes<-c(
+  "~/Documents/evoMLNFDS/rec_v_select/zero_time/time_series/subset.rec_v_weak_select_no_mig.combined_sc.out",
+  "~/Documents/evoMLNFDS/rec_v_select/zero_time/time_series/subset.rec_v_no_select_no_mig.combined_sc.out",
+  "~/Documents/evoMLNFDS/rec_v_select/zero_time/time_series/subset.no_rec_v_weak_select_no_mig.combined_sc.out",
+  "~/Documents/evoMLNFDS/rec_v_select/zero_time/time_series/subset.no_rec_v_no_select_no_mig.combined_sc.out",
+  "~/Documents/evoMLNFDS/rec_v_select/zero_time/time_series/subset.sym_rec_v_weak_select_no_mig.combined_sc.out",
+  "~/Documents/evoMLNFDS/rec_v_select/zero_time/time_series/subset.sym_rec_v_no_select_no_mig.combined_sc.out"
+)
+
+subset_weak_longitudinal_outputs<-plot_through_time(subset_weak_time_series_summary_prefixes,recs,selects)
+subset_weak_plots[[1]][[length(subset_weak_plots[[1]])+1]]<-plot_strain_freq_change(subset_weak_longitudinal_outputs[[1]])
+subset_weak_plots[[1]][[length(subset_weak_plots[[1]])+1]]<-plot_diversity_over_time(subset_weak_longitudinal_outputs[[2]])
+
+# save figures
+format_plots(subset_weak_plots,"revised.subset_weak_genotypes_")
+
+# additional
+prefix<-"revised.subset_weak_genotypes_"
+time_output_plot<-plot_grid(plotlist = list(subset_weak_plots[[1]][[14]],subset_weak_plots[[1]][[16]]),ncol=2,labels = "auto")
+ggsave(time_output_plot,file=paste0("~/Documents/evoMLNFDS/rec_v_select/zero_time/figures/",prefix,"timeseries_comparison_plot.png"),width = 15,height = 17.5, units="cm")
 
 ######################################
 # Run permutation tests on distances #
@@ -1707,7 +1755,20 @@ maela_plot<-make_comparison_plot("~/Documents/frequencyDependence/FOR_PUB/input_
 soton_snp_plot<-make_comparison_plot("~/Documents/frequencyDependence/FOR_PUB/input_files/southampton.snp.input",mass.snp.df)
 maela_snp_plot<-make_comparison_plot("~/Documents/frequencyDependence/FOR_PUB/input_files/maela.snp.input",mass.snp.df)
 
-cowplot::plot_grid(plotlist = list(soton_plot,maela_plot,soton_snp_plot,maela_snp_plot),
+locus_freq_plot<-
+  cowplot::plot_grid(plotlist = list(soton_plot,maela_plot,soton_snp_plot,maela_snp_plot),
                    ncol = 2,
                    nrow = 2,
                    labels = "auto")
+
+ggsave("~/Documents/evoMLNFDS/rec_v_select/zero_time/figures/locus_freq_plot.png",locus_freq_plot)
+
+# save plots
+save(subset_weak_plots,
+     randomised_plots,
+     permuted_plots,
+     subset_plots,
+     marker_plots,no_mig_plots,
+     weak_no_mig_plots,
+     saltational_no_mig_plots,
+     file="~/Documents/evoMLNFDS/rec_v_select/zero_time/figures/rec_v_select_plots.RDS")
