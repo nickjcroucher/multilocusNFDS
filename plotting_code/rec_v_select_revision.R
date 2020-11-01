@@ -695,7 +695,7 @@ process_simulation_data<-function(prefixes=NULL,recs=NULL,selects=NULL,summaries
     xlab("Proportion of loci in genome")+
     ylab("Density")+
     geom_density(data=genome_sizes, aes(x=Sizes), col = my_line_col, trim=TRUE)+
-    geom_text(data=genotype.summary.df,x=default_x,y=default_y,hjust=0,size=my_geom_text_size,aes(label=sprintf("Mean: %.2f\nVariance: %.2g\nSkewness: %.3f\n",Mean,Variance,Skewness)))
+    geom_text(data=genotype.summary.df,x=default_x,y=default_y,hjust=0,size=my_geom_text_size,aes(label=sprintf("Mean: %.2f\nVariance: %.2g\nSkewness: %.2f\n",Mean,Variance,Skewness)))
   out_plots[[2]]<-genome_plot
 
   # plot pairwise distances
@@ -706,7 +706,7 @@ process_simulation_data<-function(prefixes=NULL,recs=NULL,selects=NULL,summaries
     ylab("Density (log(density+1) scale)")+
     geom_density(data=genome_distances, aes(x=Distances, y=..scaled..), col = my_line_col, trim=TRUE)+
     scale_y_continuous(trans="log1p")+
-    geom_text(data=dist.summary.df,x=0.0,y=0.6,hjust=0,size=my_geom_text_size,aes(label=sprintf("Mean: %.2f\nVariance: %.2g\nSkewness: %.3f\n",Mean,Variance,Skewness)))
+    geom_text(data=dist.summary.df,x=0.0,y=0.6,hjust=0,size=my_geom_text_size,aes(label=sprintf("Mean: %.2f\nVariance: %.2g\nSkewness: %.2f\n",Mean,Variance,Skewness)))
   out_plots[[3]]<-distance_plot
 
   # plot distances to real data
@@ -742,7 +742,7 @@ process_simulation_data<-function(prefixes=NULL,recs=NULL,selects=NULL,summaries
       ylab("Density (log(density+1) scale)")+
       geom_density(data=genome_distances, aes(x=SNPDistances, y=..scaled..), col = my_line_col, trim=TRUE)+
       scale_y_continuous(trans="log1p")+
-      geom_text(data=snp.dist.summary.df,x=0.0,y=0.6,hjust=0,size=my_geom_text_size,aes(label=sprintf("Mean: %.2f\nVariance: %.3g\nSkewness: %.3f\n",Mean,Variance,Skewness)))
+      geom_text(data=snp.dist.summary.df,x=0.0,y=0.6,hjust=0,size=my_geom_text_size,aes(label=sprintf("Mean: %.2f\nVariance: %.3g\nSkewness: %.2f\n",Mean,Variance,Skewness)))
     out_plots[[6]]<-snp_distance_plot
     
     # plot SNP v accessory distances
@@ -778,11 +778,8 @@ process_simulation_data<-function(prefixes=NULL,recs=NULL,selects=NULL,summaries
       ggplot(data=snp.dist.df,aes(x=SNPDistances,y=Distances))+
       xlab("Pairwise Hamming SNP distances between genomes")+
       ylab("Pairwise binary Jaccard distances between genomes")+
-      rasterise(geom_point(alpha = 5000/nrow(snp.dist.df),size=0.5), dpi = 600)+
+      #rasterise(geom_point(alpha = 5000/nrow(snp.dist.df),size=0.5), dpi = 600)+
       #geom_point_rast(alpha = 5000/nrow(snp.dist.df),size=0.5) +
-      geom_abline(colour=my_line_col, slope = strain_slope, intercept = strain_intercept, alpha=0.5, linetype = 2)+
-      geom_density_2d(data=genome_distances[genome_distances$Distances>=(strain_intercept+strain_slope*genome_distances$SNPDistances),], aes(x=SNPDistances, y=Distances), colour = pal_npg()(2)[2], alpha = 0.5,size=0.5)+
-      geom_density_2d(data=genome_distances[genome_distances$Distances<(strain_intercept+strain_slope*genome_distances$SNPDistances),], aes(x=SNPDistances, y=Distances), colour = my_fill_high, alpha = 0.5,size=0.5) +
       facet_grid(Recombination~Selection)+
       stat_cor(aes(label = paste("rho ==",bquote(.(..r..)))),colour="black",label.x=default_x_corr,label.y=default_y_corr,hjust = 0,method="spearman",cor.coef.name="rho") +
       geom_text(data = snp.dist.df %>% dplyr::select(Recombination,Selection,PropWithin) %>% dplyr::distinct(),
@@ -798,7 +795,11 @@ process_simulation_data<-function(prefixes=NULL,recs=NULL,selects=NULL,summaries
             axis.title.x = element_text(size = 10, face = "bold"),
             axis.title.y = element_text(size = 10, face = "bold"),
             strip.text.x = element_text(size = my_facet_label_size),
-            strip.text.y = element_text(size = my_facet_label_size))
+            strip.text.y = element_text(size = my_facet_label_size)) +
+      rasterise(geom_point(alpha = 5000/nrow(snp.dist.df),size=0.5), dpi = 600) +
+      geom_abline(colour=my_line_col, slope = strain_slope, intercept = strain_intercept, alpha=0.5, linetype = 2)+
+      geom_density_2d(data=genome_distances[genome_distances$Distances>=(strain_intercept+strain_slope*genome_distances$SNPDistances),], aes(x=SNPDistances, y=Distances), colour = pal_npg()(2)[2], alpha = 0.5,size=0.5)+
+      geom_density_2d(data=genome_distances[genome_distances$Distances<(strain_intercept+strain_slope*genome_distances$SNPDistances),], aes(x=SNPDistances, y=Distances), colour = my_fill_high, alpha = 0.5,size=0.5)
     out_plots[[7]]<-comparison_distance_plot
     
     # plot trees
