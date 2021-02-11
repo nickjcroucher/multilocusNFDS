@@ -550,14 +550,21 @@ int main(int argc, char * argv[]) {
             if (gen_diff < samplingList->size() && (*samplingList)[gen_diff] > 0) {
                 //if (p.programme != "s" && p.programme != "x") {
                 if (p.programme != "x") {
-                    int compareSamplesCheck = compareSamples(gen,minGen,(*samplingList)[gen-minGen],currentIsolates,population,accessoryLoci,scList,sampledVtScFreq,sampledNvtScFreq,sampledSeroFreq[gen-minGen],serotypeList,vtCogFittingStatsList,nvtCogFittingStatsList,strainFittingStatsList,sampleOutFile,&p);
-                    if (compareSamplesCheck != 0) {
-                        std::cerr << "Unable to compare simulated and actual frequencies" << std::endl;
-                        usage(argv[0]);
-                        return 1;
+                    if (continue_reproducing) {
+                        int compareSamplesCheck = compareSamples(gen,minGen,(*samplingList)[gen-minGen],currentIsolates,population,accessoryLoci,scList,sampledVtScFreq,sampledNvtScFreq,sampledSeroFreq[gen-minGen],serotypeList,vtCogFittingStatsList,nvtCogFittingStatsList,strainFittingStatsList,sampleOutFile,&p);
+                        if (compareSamplesCheck != 0) {
+                            std::cerr << "Unable to compare simulated and actual frequencies" << std::endl;
+                            usage(argv[0]);
+                            return 1;
+                        }
                     } else {
-                        numberComparisons++;
+                        // add maximum value to statistics, which
+                        // is ln(2) for JSD (observed)
+                        vtCogFittingStatsList.push_back(log(2));
+                        nvtCogFittingStatsList.push_back(log(2));
+                        strainFittingStatsList.push_back(log(2));
                     }
+                    numberComparisons++;
                 } else if (p.programme == "f" || p.programme == "b") {
                     int justRecordStatsCheck = justRecordStats(gen,minGen,(*samplingList)[gen-minGen],currentIsolates,accessoryLoci);
                     if (justRecordStatsCheck != 0) {
@@ -566,14 +573,6 @@ int main(int argc, char * argv[]) {
                         return 1;
                     } else {
                         numberComparisons++;
-                    }
-                }
-                if (!continue_reproducing) {
-                    // penalise simulations where simulation has been halted
-                    for (unsigned int i = 0; i < vtCogFittingStatsList.size(); i++) {
-                        vtCogFittingStatsList[i]+=1.0;
-                        nvtCogFittingStatsList[i]+=1.0;
-                        strainFittingStatsList[i]+=1.0;
                     }
                 }
             }
