@@ -545,7 +545,7 @@ int main(int argc, char * argv[]) {
         }
     
         // compare to genomes in the post-vaccine period
-        if (gen > 0) {
+        if (gen >=   0) {
             unsigned int gen_diff = gen-minGen;
             if (gen_diff < samplingList->size() && (*samplingList)[gen_diff] > 0) {
                 //if (p.programme != "s" && p.programme != "x") {
