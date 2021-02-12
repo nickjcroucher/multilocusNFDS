@@ -372,7 +372,7 @@ int main(int argc, char * argv[]) {
     
     // initialise population in first generation, record simulated population statistics
     int gen = minGen;
-    int initialiseCheck = getStartingIsolates(population,currentIsolates,accessoryLoci,p.popSize,eqFreq,cogWeights,cogDeviations, vtScFreq[0],nvtScFreq[0],scList);
+    int initialiseCheck = getStartingIsolates(population,currentIsolates,accessoryLoci,p.popSize,eqFreq,cogWeights,cogDeviations, vtScFreq[0],nvtScFreq[0],scList,minGen);
     if (initialiseCheck != 0) {
         std::cerr << "Unable to initialise population" << std::endl;
         usage(argv[0]);
@@ -545,7 +545,7 @@ int main(int argc, char * argv[]) {
         }
     
         // compare to genomes in the post-vaccine period
-        if (gen >=   0) {
+        if (gen >= 0) {
             unsigned int gen_diff = gen-minGen;
             if (gen_diff < samplingList->size() && (*samplingList)[gen_diff] > 0) {
                 //if (p.programme != "s" && p.programme != "x") {

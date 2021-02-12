@@ -874,14 +874,22 @@ int dividePopulationForImmigrationByTime(std::vector<isolate*> *pop, int minGen,
 // get first year sample //
 ///////////////////////////
 
-int getStartingIsolates(std::vector<isolate*> *pop,std::vector<isolate*> *first,std::vector<cog*> *accessoryLoci,int psize,std::vector<double> &eqFreq,std::vector<double> &cogWeights,std::vector<double> &cogDeviations,std::vector<int> &startingVtScFrequencies,std::vector<int> &startingNvtScFrequencies,std::vector<int> &scList) {
+int getStartingIsolates(std::vector<isolate*> *pop,std::vector<isolate*> *first,std::vector<cog*> *accessoryLoci,int psize,std::vector<double> &eqFreq,std::vector<double> &cogWeights,std::vector<double> &cogDeviations,std::vector<int> &startingVtScFrequencies,std::vector<int> &startingNvtScFrequencies,std::vector<int> &scList, int minGen) {
     
     // get all isolates observed in the pre- or peri-vaccine samples
     std::vector<isolate*> *possibleFirst = new std::vector<isolate*>;
     std::vector<isolate*>::iterator iter;
     for (iter = pop->begin(), pop->end() ; iter != pop->end(); ++iter) {
-        if ((*iter)->year <= 0) {
-            possibleFirst->push_back(*iter);
+        if (minGen < 0) {
+            // Use pre-vaccine population if possible
+            if ((*iter)->year < 0) {
+                possibleFirst->push_back(*iter);
+            }
+        } else {
+            // if no pre-vaccine population, use the peri-vaccination population
+            if ((*iter)->year == 0) {
+                possibleFirst->push_back(*iter);
+            }
         }
     }
     

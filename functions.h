@@ -71,7 +71,7 @@ int dividePopulationForImmigration(std::vector<isolate*> *pop,std::vector<int> *
 int dividePopulationForImmigrationByTime(std::vector<isolate*> *pop, int minGen, int numgen,std::vector<std::vector<isolate*> > *popByTime);
 
 // get isolates for starting population
-int getStartingIsolates(std::vector<isolate*> *pop,std::vector<isolate*> *first,std::vector<cog*> *accessoryLoci, int,std::vector<double> &eqFreq,std::vector<double> &cogWeights,std::vector<double> &cogDeviations,std::vector<int> &startingVtScFrequencies,std::vector<int> &startingNvtScFrequencies,std::vector<int> &scList);
+int getStartingIsolates(std::vector<isolate*> *pop,std::vector<isolate*> *first,std::vector<cog*> *accessoryLoci, int,std::vector<double> &eqFreq,std::vector<double> &cogWeights,std::vector<double> &cogDeviations,std::vector<int> &startingVtScFrequencies,std::vector<int> &startingNvtScFrequencies,std::vector<int> &scList, int minGen);
 
 // sample selected from first generation
 int firstSample(std::vector<isolate*> *currentIsolates,int firstSample,std::ofstream& sampleOutFile,int minGen);
