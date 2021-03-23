@@ -1029,7 +1029,7 @@ int alterVaccineFormulation(std::vector<isolate*> *currentIsolates,std::vector<i
     
     // change VT of potential immigrant isolates
     for (unsigned int i = 0; i < popBySc->size(); i++) {
-        for (unsigned int j = 0; j < popBySc[i].size(); j++) {
+        for (unsigned int j = 0; j < (*popBySc)[i].size(); j++) {
             for (iter = (*popBySc)[i][j].begin(), (*popBySc)[i][j].end(); iter != (*popBySc)[i][j].end(); ++iter) {
                 if (!(*iter)->vt) {
                     (*iter)->vt = (*iter)->latent_vt;
