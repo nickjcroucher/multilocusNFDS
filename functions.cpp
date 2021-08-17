@@ -704,16 +704,34 @@ int parseOrderingFile(char* orderingFilename,std::vector<cog*> *accessoryLoci,st
     }
     
     // assign weights appropriately
-    for (unsigned int cindex = 0; cindex < orderedAccessoryLoci.size(); cindex++) {
+    unsigned int cindex = 0;
+    if (sp->het_mode == "l") {
         for (cit = accessoryLoci->begin(), accessoryLoci->end(); cit != accessoryLoci->end(); ++cit) {
-            if ((*cit)->id.compare(orderedAccessoryLoci[cindex]) == 0) {
-                if ((float(cindex)/float(orderedAccessoryLoci.size())) <= (1.0-sp->selectedProp)) {
-                    (*cit)->weight = sp->lowerSelection;
-                } else {
-                    (*cit)->weight = sp->higherSelection;
+            double relative_weight_from_order = 1 - 1 / (1 + exp(-1 * sp->decayRate * (float(cindex) - sp->selectedProp * accessoryLoci->size())));
+            (*cit)->weight = sp->higherSelection * relative_weight_from_order;
+            cindex++;
+        }
+    } else if (sp->het_mode == "e") {
+        for (cit = accessoryLoci->begin(), accessoryLoci->end(); cit != accessoryLoci->end(); ++cit) {
+            double relative_weight_from_order = exp(-1 * sp->decayRate * float(cindex));
+            (*cit)->weight = sp->higherSelection * relative_weight_from_order;
+            cindex++;
+        }
+    } else if (sp->het_mode == "s") {
+        for (unsigned int cindex = 0; cindex < orderedAccessoryLoci.size(); cindex++) {
+            for (cit = accessoryLoci->begin(), accessoryLoci->end(); cit != accessoryLoci->end(); ++cit) {
+                if ((*cit)->id.compare(orderedAccessoryLoci[cindex]) == 0) {
+                    if ((float(cindex)/float(orderedAccessoryLoci.size())) <= (1.0-sp->selectedProp)) {
+                        (*cit)->weight = sp->lowerSelection;
+                    } else {
+                        (*cit)->weight = sp->higherSelection;
+                    }
                 }
             }
         }
+    } else {
+        std::cerr << "Allowed heterogeneous functions are (l)ogistic, (e)xponential and (s)tep" << std::endl;
+        exit(1);
     }
     
     return 0;
