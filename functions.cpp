@@ -703,21 +703,30 @@ int parseOrderingFile(char* orderingFilename,std::vector<cog*> *accessoryLoci,st
         return 1;
     }
     
-    // assign weights appropriately
+    // assign weights appropriately - most conserved frequencies are at the END of the list
     unsigned int cindex = 0;
-    if (sp->het_mode == "l") {
+    if (sp->het_mode == "l") { // logistic
         for (cit = accessoryLoci->begin(), accessoryLoci->end(); cit != accessoryLoci->end(); ++cit) {
             double relative_weight_from_order = 1 - 1 / (1 + exp(-1 * sp->decayRate * (float(cindex) - sp->selectedProp * accessoryLoci->size())));
             (*cit)->weight = sp->higherSelection * relative_weight_from_order;
             cindex++;
         }
-    } else if (sp->het_mode == "e") {
+    } else if (sp->het_mode == "e") { // exponential
         for (cit = accessoryLoci->begin(), accessoryLoci->end(); cit != accessoryLoci->end(); ++cit) {
-            double relative_weight_from_order = exp(-1 * sp->decayRate * float(cindex));
+            double relative_weight_from_order = exp(-1 * sp->decayRate * float(accessoryLoci->size() - cindex));
             (*cit)->weight = sp->higherSelection * relative_weight_from_order;
             cindex++;
         }
-    } else if (sp->het_mode == "s") {
+    } else if (sp->het_mode == "r") { // linear
+        for (cit = accessoryLoci->begin(), accessoryLoci->end(); cit != accessoryLoci->end(); ++cit) {
+            double relative_weight_from_order = 1 - (float(accessoryLoci->size() - cindex) * sp->decayRate);
+            if (relative_weight_from_order < 0.0) {
+                relative_weight_from_order = 0.0;
+            }
+            (*cit)->weight = sp->higherSelection * relative_weight_from_order;
+            cindex++;
+        }
+    } else if (sp->het_mode == "s") { // step
         for (unsigned int cindex = 0; cindex < orderedAccessoryLoci.size(); cindex++) {
             for (cit = accessoryLoci->begin(), accessoryLoci->end(); cit != accessoryLoci->end(); ++cit) {
                 if ((*cit)->id.compare(orderedAccessoryLoci[cindex]) == 0) {
