@@ -706,8 +706,9 @@ int parseOrderingFile(char* orderingFilename,std::vector<cog*> *accessoryLoci,st
     // assign weights appropriately - most conserved frequencies are at the END of the list
     unsigned int cindex = 0;
     if (sp->het_mode == "l") { // logistic
+        max_value = 1 - 1 / (1 + exp(-1 * sp->decayRate * (float(accessoryLoci->size()) - sp->selectedProp * float(accessoryLoci->size()))))
         for (cit = accessoryLoci->begin(), accessoryLoci->end(); cit != accessoryLoci->end(); ++cit) {
-            double relative_weight_from_order = 1 - 1 / (1 + exp(-1 * sp->decayRate * (float(cindex) - sp->selectedProp * accessoryLoci->size())));
+            double relative_weight_from_order = 1 - 1 / (1 + exp(-1 * sp->decayRate * (float(cindex) - sp->selectedProp * float(accessoryLoci->size())))) * 1 / max_value;
             (*cit)->weight = sp->higherSelection * relative_weight_from_order;
             cindex++;
         }
