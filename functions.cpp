@@ -706,21 +706,21 @@ int parseOrderingFile(char* orderingFilename,std::vector<cog*> *accessoryLoci,st
     // assign weights appropriately - most conserved frequencies are at the END of the list
     unsigned int cindex = 0;
     if (sp->het_mode == "l") { // logistic
-        double max_value = 1.0 / (1.0 + exp(-1.0 * sp->decayRate * (float(accessoryLoci->size()) - (1 - sp->selectedProp) * float(accessoryLoci->size()))));
+        double max_value = sp->lowerSelection + 1.0 / (1.0 + exp(-1.0 * sp->decayRate * (float(accessoryLoci->size()) - (1 - sp->selectedProp) * float(accessoryLoci->size()))));
         for (cit = accessoryLoci->begin(), accessoryLoci->end(); cit != accessoryLoci->end(); ++cit) {
-            double relative_weight_from_order = 1.0 / (1.0 + exp(-1.0 * sp->decayRate * (float(cindex) - (1 - sp->selectedProp) * float(accessoryLoci->size())))) * 1 / max_value;
+            double relative_weight_from_order = sp->lowerSelection + 1.0 / (1.0 + exp(-1.0 * sp->decayRate * (float(cindex) - (1 - sp->selectedProp) * float(accessoryLoci->size())))) * 1 / max_value;
             (*cit)->weight = sp->higherSelection * relative_weight_from_order;
             cindex++;
         }
     } else if (sp->het_mode == "e") { // exponential
         for (cit = accessoryLoci->begin(), accessoryLoci->end(); cit != accessoryLoci->end(); ++cit) {
-            double relative_weight_from_order = exp(-1 * sp->decayRate * float(accessoryLoci->size() - cindex));
+            double relative_weight_from_order = sp->lowerSelection + exp(-1 * sp->decayRate * float(accessoryLoci->size() - cindex));
             (*cit)->weight = sp->higherSelection * relative_weight_from_order;
             cindex++;
         }
     } else if (sp->het_mode == "r") { // linear
         for (cit = accessoryLoci->begin(), accessoryLoci->end(); cit != accessoryLoci->end(); ++cit) {
-            double relative_weight_from_order = 1 - (float(accessoryLoci->size() - cindex) * sp->decayRate);
+            double relative_weight_from_order = sp->lowerSelection + 1 - (float(accessoryLoci->size() - cindex) * sp->decayRate);
             if (relative_weight_from_order < 0.0) {
                 relative_weight_from_order = 0.0;
             }
