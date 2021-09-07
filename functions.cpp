@@ -707,25 +707,40 @@ int parseOrderingFile(char* orderingFilename,std::vector<cog*> *accessoryLoci,st
     unsigned int cindex = 0;
     if (sp->het_mode == "l") { // logistic
         double max_value = sp->lowerSelection + 1.0 / (1.0 + exp(-1.0 * sp->decayRate * (float(accessoryLoci->size()) - (1 - sp->selectedProp) * float(accessoryLoci->size()))));
-        for (cit = accessoryLoci->begin(), accessoryLoci->end(); cit != accessoryLoci->end(); ++cit) {
-            double relative_weight_from_order = sp->lowerSelection + 1.0 / (1.0 + exp(-1.0 * sp->decayRate * (float(cindex) - (1 - sp->selectedProp) * float(accessoryLoci->size())))) * 1 / max_value;
-            (*cit)->weight = sp->higherSelection * relative_weight_from_order;
-            cindex++;
+        for (unsigned int cindex = 0; cindex < orderedAccessoryLoci.size(); cindex++) {
+            for (cit = accessoryLoci->begin(), accessoryLoci->end(); cit != accessoryLoci->end(); ++cit) {
+                if ((*cit)->id.compare(orderedAccessoryLoci[cindex]) == 0) {
+                    double relative_weight_from_order = (sp->lowerSelection + 1.0 / (1.0 + exp(-1.0 * sp->decayRate * (float(cindex) + 1.0 - (1 - sp->selectedProp) * float(accessoryLoci->size()))))) * (1 / max_value);
+                    (*cit)->weight = sp->higherSelection * relative_weight_from_order;
+                    break;
+                }
+            }
         }
     } else if (sp->het_mode == "e") { // exponential
-        for (cit = accessoryLoci->begin(), accessoryLoci->end(); cit != accessoryLoci->end(); ++cit) {
-            double relative_weight_from_order = sp->lowerSelection + exp(-1 * sp->decayRate * float(accessoryLoci->size() - cindex));
-            (*cit)->weight = sp->higherSelection * relative_weight_from_order;
-            cindex++;
+        double max_value = sp->lowerSelection + exp(-1 * sp->decayRate * 0.0);
+        for (unsigned int cindex = 0; cindex < orderedAccessoryLoci.size(); cindex++) {
+            for (cit = accessoryLoci->begin(), accessoryLoci->end(); cit != accessoryLoci->end(); ++cit) {
+                if ((*cit)->id.compare(orderedAccessoryLoci[cindex]) == 0) {
+                    double relative_weight_from_order = (sp->lowerSelection + exp(-1 * sp->decayRate * float(accessoryLoci->size() - cindex - 1))) * (1 / max_value);
+                    (*cit)->weight = sp->higherSelection * relative_weight_from_order;
+                    break;
+                }
+            }
         }
     } else if (sp->het_mode == "r") { // linear
-        for (cit = accessoryLoci->begin(), accessoryLoci->end(); cit != accessoryLoci->end(); ++cit) {
-            double relative_weight_from_order = sp->lowerSelection + 1 - (float(accessoryLoci->size() - cindex) * sp->decayRate);
-            if (relative_weight_from_order < 0.0) {
-                relative_weight_from_order = 0.0;
+        double max_value = sp->lowerSelection + 1;
+        for (unsigned int cindex = 0; cindex < orderedAccessoryLoci.size(); cindex++) {
+            for (cit = accessoryLoci->begin(), accessoryLoci->end(); cit != accessoryLoci->end(); ++cit) {
+                if ((*cit)->id.compare(orderedAccessoryLoci[cindex]) == 0) {
+                    double relative_weight_from_order = sp->lowerSelection + 1 - (float(accessoryLoci->size() - cindex - 1) * sp->decayRate);
+                    relative_weight_from_order = relative_weight_from_order * (1 / max_value);
+                    if (relative_weight_from_order < 0.0) {
+                        relative_weight_from_order = 0.0;
+                    }
+                    (*cit)->weight = sp->higherSelection * relative_weight_from_order;
+                    break;
+                }
             }
-            (*cit)->weight = sp->higherSelection * relative_weight_from_order;
-            cindex++;
         }
     } else if (sp->het_mode == "s") { // step
         for (unsigned int cindex = 0; cindex < orderedAccessoryLoci.size(); cindex++) {
@@ -736,14 +751,14 @@ int parseOrderingFile(char* orderingFilename,std::vector<cog*> *accessoryLoci,st
                     } else {
                         (*cit)->weight = sp->higherSelection;
                     }
+                    break;
                 }
             }
         }
     } else {
-        std::cerr << "Allowed heterogeneous functions are (l)ogistic, (e)xponential and (s)tep" << std::endl;
+        std::cerr << "Allowed heterogeneous functions are (l)ogistic, (e)xponential, linea(r) and (s)tep" << std::endl;
         exit(1);
     }
-    
     return 0;
 }
 
