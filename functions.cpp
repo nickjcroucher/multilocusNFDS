@@ -146,7 +146,7 @@ int parseInputFile(std::vector<isolate*> *pop, std::vector<cog*> *accessoryLoci,
             }
             if (iname != "Taxon" && sample_time != -1 && sample_sc != -1 && sample_serotype.compare("noSero") != 0) {
                 std::vector<bool> sample_markers(0);
-                isolate* tmp = new isolate(sample_id,sample_time,sample_sc,sample_serotype,sample_vt,sample_latent_vt,&sample_genotype,&sample_markers);
+                isolate* tmp = new isolate(sample_id,sample_time,sample_sc,sample_serotype,sample_vt,sample_latent_vt,&sample_genotype,&sample_markers,1.0);
                 pop->push_back(tmp);
                 // record isolate information
                 samplingTimes.push_back(sample_time);
@@ -1125,8 +1125,8 @@ int reproduction(std::vector<isolate*> *currentIsolates,std::vector<isolate*> *f
     int genotypeCount = 0;
     
     // basic reproduction number based on immigration and population size
-    double baseR = (1-sp->immigrationRate)*(double(sp->popSize)/double(currentIsolates->size()));
-    
+    double baseR = (1-sp->immigrationRate);
+
     // sort current population
     std::vector<isolate*>::iterator iter;
     std::sort(currentIsolates->begin(),currentIsolates->end());
@@ -1135,6 +1135,10 @@ int reproduction(std::vector<isolate*> *currentIsolates,std::vector<isolate*> *f
     std::string oldId = "";
     double oldFitness = 0.0;
     
+    // Store non-standardised fitnesses
+    std::vector<double> unstandardised_fitnesses;
+    
+    // Calculate non-standardised fitnesses
     for (iter = currentIsolates->begin(), currentIsolates->end(); iter != currentIsolates->end(); ++iter) {
         
         // calculate fitness of each new genotype in population
@@ -1165,11 +1169,31 @@ int reproduction(std::vector<isolate*> *currentIsolates,std::vector<isolate*> *f
             double overallFitness = baseR*vaccineFit*freqDepFit;
             oldFitness = overallFitness;
             oldId = (*iter)->id;
-            
+//            if (overallFitness > 100000) {
+//                std::cerr << "Overall fitness is " << oldFitness << std::endl;
+//                std::cerr << "baseR fitness is " << baseR << std::endl;
+//                std::cerr << "vaccineFit fitness is " << vaccineFit << std::endl;
+//                std::cerr << "freqDepFit fitness is " << freqDepFit << std::endl;
+//            }
+//
         }
         
-        // select offspring by Poisson distribution
-        int progeny = gsl_ran_poisson(rgen,oldFitness);
+        (*iter)->fitness = oldFitness;
+        unstandardised_fitnesses.push_back(oldFitness);
+        
+    }
+    
+    // Standardise fitnesses for density dependent-regulation
+    double densdep = double(sp->popSize)/double(currentIsolates->size());
+    double mean_unstandardised_fitness = std::accumulate(unstandardised_fitnesses.begin(),
+                                                         unstandardised_fitnesses.end(),
+                                                         0.0)/unstandardised_fitnesses.size();
+    double standardisation_factor = densdep/mean_unstandardised_fitness;
+    
+    // select offspring by Poisson distribution using standardised fitness
+    for (iter = currentIsolates->begin(), currentIsolates->end(); iter != currentIsolates->end(); ++iter) {
+
+        int progeny = gsl_ran_poisson(rgen,standardisation_factor * (*iter)->fitness);
         for (int p = 0; p < progeny; p++) {
             futureIsolates->push_back((*iter));
             // record statistics
@@ -1179,6 +1203,9 @@ int reproduction(std::vector<isolate*> *currentIsolates,std::vector<isolate*> *f
                 futureNvtScs.push_back((*iter)->sc);
             }
             futureSerotypes.push_back((*iter)->serotype);
+//            if (futureSerotypes.size() > 110) {
+//                std::cerr << "Serotype size is " << futureSerotypes.size() << std::endl;
+//            }
         }
         genotypeCount++;
         
@@ -1431,7 +1458,7 @@ int recombination(std::vector<isolate*> *currentIsolates,std::vector<isolate*> *
                 
                 // store in new population
                 
-                isolate* tmp = new isolate(new_id,recipient.year,recipient.sc,recipient.serotype,recipient.vt,recipient.latent_vt,&recipient.genotype,&recipient.markers);
+                isolate* tmp = new isolate(new_id,recipient.year,recipient.sc,recipient.serotype,recipient.vt,recipient.latent_vt,&recipient.genotype,&recipient.markers,recipient.fitness);
                 futureIsolates->push_back(tmp);
                 
             } else {
