@@ -223,7 +223,6 @@ int parseInputFile(std::vector<isolate*> *pop, std::vector<cog*> *accessoryLoci,
             for (unsigned int i = 0; i < tmpCogList.size(); i++) {
                 // data structures for recording frequencies
                 int overallFreq = 0;
-    //            std::vector<double> cogFrequencies(samplingList.size(),0);
                 std::vector<double> cogFrequencies(samplingTimes.size(),0);
                 double eqFreq = 0;
                 // calculate gene frequencies from isolates
@@ -235,7 +234,6 @@ int parseInputFile(std::vector<isolate*> *pop, std::vector<cog*> *accessoryLoci,
                     }
                 }
                 // retain if present at intermediate frequency OR vt-defining COG
-    //            if ((double(overallFreq)/double(pop->size()) >= lower && double(overallFreq)/double(pop->size()) <= upper) || i == v) {
                 if ((eqFreq >= (lower-1e-07) && eqFreq <= (upper+1e-07)) || i == unsigned(v)) {
                     includeLocus[i] = 1;
                     int vtType = 0;
@@ -373,10 +371,9 @@ int parseMarkerFile(std::vector<isolate*> *pop,char *markerFilename,std::vector<
             // modify individual isolates
         }
 
-        
         // check all marker lengths are the same
         std::vector<isolate*>::iterator iiter;
-        int markerLength = tmpMarkerList.size();
+        long markerLength = tmpMarkerList.size();
         for (iiter = pop->begin(), pop->end() ; iiter != pop->end(); ++iiter) {
             if (unsigned(markerLength) != (*iiter)->markers.size()) {
                 std::cerr << "Isolate " << (*iiter)->id << " has incorrect marker information; expecting " << markerLength << " but found " << (*iiter)->markers.size() << std::endl;
@@ -398,13 +395,13 @@ int parseMarkerFile(std::vector<isolate*> *pop,char *markerFilename,std::vector<
 //////////////////////////
 
 int compareInputPopulations(std::vector<isolate*> *popA, std::vector<isolate*> *popB, bool check_markers) {
-    
-    int genotype_length = -1;
+
+    long genotype_length = -1;
     std::vector<isolate*>::iterator iter;
     
     // check populationA genotype lengths are consistent
     for (iter = popA->begin(), popA->end() ; iter != popA->end(); ++iter) {
-        int current_genotype_size = (*iter)->genotype.size(); // explicit cast for precision reasons
+        long current_genotype_size = (*iter)->genotype.size(); // explicit cast for precision reasons
         if (genotype_length != -1 && genotype_length != current_genotype_size) {
             std::cerr << "Inconsistent genotype length for isolate " << (*iter)->id << " in first population" << std::endl;
             return 1;
@@ -415,7 +412,7 @@ int compareInputPopulations(std::vector<isolate*> *popA, std::vector<isolate*> *
 
     // check populationB genotype lengths are consistent
     for (iter = popB->begin(), popB->end() ; iter != popB->end(); ++iter) {
-        int current_genotype_size = (*iter)->genotype.size();
+        long current_genotype_size = (*iter)->genotype.size();
         if (genotype_length != current_genotype_size) {
             std::cerr << "Inconsistent genotype length for isolate " << (*iter)->id << " in second population - may not match that in the first population" << std::endl;
             return 1;
@@ -428,7 +425,7 @@ int compareInputPopulations(std::vector<isolate*> *popA, std::vector<isolate*> *
         
         // check populationA genotype lengths are consistent
         for (iter = popA->begin(), popA->end() ; iter != popA->end(); ++iter) {
-            int current_marker_size = (*iter)->markers.size();
+            long current_marker_size = (*iter)->markers.size();
             if (genotype_length != -1 && genotype_length != current_marker_size) {
                 std::cerr << "Inconsistent marker genotype length for isolate " << (*iter)->id << " in first population" << std::endl;
                 return 1;
@@ -439,7 +436,7 @@ int compareInputPopulations(std::vector<isolate*> *popA, std::vector<isolate*> *
         
         // check populationB genotype lengths are consistent
         for (iter = popB->begin(), popB->end() ; iter != popB->end(); ++iter) {
-            int current_marker_size = (*iter)->markers.size();
+            long current_marker_size = (*iter)->markers.size();
             if (genotype_length != current_marker_size) {
                 std::cerr << "Inconsistent marker genotype length for isolate " << (*iter)->id << " in second population - may not match that in the first population" << std::endl;
                 return 1;
@@ -576,10 +573,6 @@ int parseFrequencyFile(char *frequencyFilename,std::vector<cog*> *accessoryLoci)
                     std::vector<cog*>::iterator cit;
                     for (cit = accessoryLoci->begin(), accessoryLoci->end(); cit != accessoryLoci->end(); ++cit) {
                         if ((*cit)->id.compare(cname) == 0) {
-//                        if ((*cit)->id == cname) {
-//                            cog* newLocus = (*cit);
-//                            std::vector<double> newFreq(newLocus->actualFreq.size(),frac);
-//                            (*cit)->actualFreq = newFreq;
                             (*cit)->eqFreq = frac;
                         }
                     }
@@ -812,22 +805,17 @@ int generateMigrantPool(std::vector<std::vector<std::vector<isolate*> > > *migra
 
 int dividePopulationForImmigration(std::vector<isolate*> *pop,std::vector <int> *scList,std::vector<std::vector<isolate*> > *popBySc, int maxScNum) {
     
-//    int maxScNum = *std::max_element(std::begin(*scList),std::end(*scList));
-    
     // check there are > 0 sequence clusters
     if (maxScNum == 0) {
         std::cerr << "Cannot find any sequence clusters" << std::endl;
     }
     
-//    maxScNum++;
-//    std::vector<std::vector<isolate*> > tmpStrains(maxScNum);
     std::vector<std::vector<isolate*> > tmpStrains(scList->size());
     
     for (unsigned int s = 0; s < scList->size(); s++) {
         std::vector<isolate*>::iterator cit;
         for (cit = pop->begin(), pop->end(); cit != pop->end(); ++cit) {
             if ((*cit)->sc == (*scList)[s]) {
-//                tmpStrains[(*scList)[s]].push_back((*cit));
                 tmpStrains[s].push_back((*cit));
             }
         }
