@@ -1169,13 +1169,6 @@ int reproduction(std::vector<isolate*> *currentIsolates,std::vector<isolate*> *f
             double overallFitness = baseR*vaccineFit*freqDepFit;
             oldFitness = overallFitness;
             oldId = (*iter)->id;
-//            if (overallFitness > 100000) {
-//                std::cerr << "Overall fitness is " << oldFitness << std::endl;
-//                std::cerr << "baseR fitness is " << baseR << std::endl;
-//                std::cerr << "vaccineFit fitness is " << vaccineFit << std::endl;
-//                std::cerr << "freqDepFit fitness is " << freqDepFit << std::endl;
-//            }
-//
         }
         
         (*iter)->fitness = oldFitness;
@@ -1203,9 +1196,6 @@ int reproduction(std::vector<isolate*> *currentIsolates,std::vector<isolate*> *f
                 futureNvtScs.push_back((*iter)->sc);
             }
             futureSerotypes.push_back((*iter)->serotype);
-//            if (futureSerotypes.size() > 110) {
-//                std::cerr << "Serotype size is " << futureSerotypes.size() << std::endl;
-//            }
         }
         genotypeCount++;
         
