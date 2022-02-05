@@ -1177,11 +1177,19 @@ int reproduction(std::vector<isolate*> *currentIsolates,std::vector<isolate*> *f
     }
     
     // Standardise fitnesses for density dependent-regulation
-    double densdep = double(sp->popSize)/double(currentIsolates->size());
-    double mean_unstandardised_fitness = std::accumulate(unstandardised_fitnesses.begin(),
-                                                         unstandardised_fitnesses.end(),
-                                                         0.0)/unstandardised_fitnesses.size();
-    double standardisation_factor = densdep/mean_unstandardised_fitness;
+    double standardisation_factor = 1.0;
+    if (sp->densdepMode == 0) {
+        standardisation_factor = double(sp->popSize)/double(currentIsolates->size());
+    } else if (sp->densdepMode == 1) {
+        double densdep = double(sp->popSize)/double(currentIsolates->size());
+        double mean_unstandardised_fitness = std::accumulate(unstandardised_fitnesses.begin(),
+                                                             unstandardised_fitnesses.end(),
+                                                             0.0)/unstandardised_fitnesses.size();
+        standardisation_factor = densdep/mean_unstandardised_fitness;
+    } else {
+        std::cerr << "Unrecognsised densdep mode: " << sp->densdepMode << std::endl;
+    }
+    std::cerr << "Popsize is " << currentIsolates->size() << std::endl;
     
     // select offspring by Poisson distribution using standardised fitness
     for (iter = currentIsolates->begin(), currentIsolates->end(); iter != currentIsolates->end(); ++iter) {

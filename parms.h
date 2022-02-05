@@ -37,6 +37,7 @@ struct parms {
     int genotypeSampleSize;
     double decayRate;
     std::string het_mode;
+    int densdepMode;
 };
 
 // structure for isolate objects

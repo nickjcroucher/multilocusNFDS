@@ -48,6 +48,7 @@ int main(int argc, char * argv[]) {
     p.genotypeSampleSize = 0;
     p.decayRate = 0.01;
     p.het_mode = "s";
+    p.densdepMode = 0;
     
     ////////////////////////
     // Parse command line //
@@ -73,7 +74,7 @@ int main(int argc, char * argv[]) {
         return 1;
     } else {
         int opt = 0;
-        while ((opt = getopt(argc,argv,"Ehc:p:s:v:i:t:n:g:u:l:y:j:k:f:x:w:r:o:m:z:e:a:b:d:q:F:1:2:0:H:D:")) != EOF) {
+        while ((opt = getopt(argc,argv,"Ehc:p:s:v:i:t:n:g:u:l:y:j:k:f:x:w:r:o:m:z:e:a:b:d:q:F:1:2:0:H:D:M:")) != EOF) {
             switch (opt) {
                 case 'h':
                     usage(argv[0]);
@@ -179,6 +180,9 @@ int main(int argc, char * argv[]) {
                     break;
                 case 'D':
                     p.decayRate = atof(optarg);
+                    break;
+                case 'M':
+                    p.densdepMode = atoi(optarg);
                     break;
             }
         }
