@@ -1189,7 +1189,6 @@ int reproduction(std::vector<isolate*> *currentIsolates,std::vector<isolate*> *f
     } else {
         std::cerr << "Unrecognsised densdep mode: " << sp->densdepMode << std::endl;
     }
-    std::cerr << "Popsize is " << currentIsolates->size() << std::endl;
     
     // select offspring by Poisson distribution using standardised fitness
     for (iter = currentIsolates->begin(), currentIsolates->end(); iter != currentIsolates->end(); ++iter) {
