@@ -386,6 +386,7 @@ int main(int argc, char * argv[]) {
     // initialise population in first generation, record simulated population statistics
     int gen = minGen;
     int initialiseCheck = getStartingIsolates(population,
+                                              &p,
                                               currentIsolates,
                                               accessoryLoci,
                                               p.popSize,
