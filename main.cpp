@@ -68,13 +68,14 @@ int main(int argc, char * argv[]) {
     double popLimitFactor = -1.0;
     bool migrantEvolution = 0;
     bool zeroTimeSelection = 0;
+    float seedStartingPopulation = 0.0;
 
     if (argc == 1) {
         usage(argv[0]);
         return 1;
     } else {
         int opt = 0;
-        while ((opt = getopt(argc,argv,"Ehc:p:s:v:i:t:n:g:u:l:y:j:k:f:x:w:r:o:m:z:e:a:b:d:q:F:1:2:0:H:D:M:")) != EOF) {
+        while ((opt = getopt(argc,argv,"Ehc:p:s:v:i:t:n:g:u:l:y:j:k:f:x:w:r:o:m:z:e:a:b:d:q:F:1:2:0:H:D:M:S:")) != EOF) {
             switch (opt) {
                 case 'h':
                     usage(argv[0]);
@@ -183,6 +184,9 @@ int main(int argc, char * argv[]) {
                     break;
                 case 'M':
                     p.densdepMode = atoi(optarg);
+                    break;
+                case 'S':
+                    seedStartingPopulation = atof(optarg);
                     break;
             }
         }
@@ -381,7 +385,21 @@ int main(int argc, char * argv[]) {
     
     // initialise population in first generation, record simulated population statistics
     int gen = minGen;
-    int initialiseCheck = getStartingIsolates(population,currentIsolates,accessoryLoci,p.popSize,eqFreq,cogWeights,cogDeviations, vtScFreq[0],nvtScFreq[0],scList,minGen);
+    int initialiseCheck = getStartingIsolates(population,
+                                              currentIsolates,
+                                              accessoryLoci,
+                                              p.popSize,
+                                              eqFreq,
+                                              cogWeights,
+                                              cogDeviations,
+                                              vtScFreq[0],
+                                              nvtScFreq[0],
+                                              scList,
+                                              minGen,
+                                              seedStartingPopulation,
+                                              migrantFilename,
+                                              migrant_population,
+                                              maxScNum);
     if (initialiseCheck != 0) {
         std::cerr << "Unable to initialise population" << std::endl;
         usage(argv[0]);
