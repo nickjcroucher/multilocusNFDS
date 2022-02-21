@@ -395,7 +395,7 @@ int main(int argc, char * argv[]) {
                                               cogDeviations,
                                               vtScFreq[0],
                                               nvtScFreq[0],
-                                              scList,
+                                              &scList,
                                               minGen,
                                               seedStartingPopulation,
                                               migrantFilename,
