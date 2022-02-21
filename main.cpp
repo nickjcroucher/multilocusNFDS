@@ -551,7 +551,7 @@ int main(int argc, char * argv[]) {
             }
             
             // allow cells to reproduce and update COG deviations array
-            int reproCheck = reproduction(currentIsolates,futureIsolates,migrantPool,&cogWeights,&cogDeviations,&p,&eqFreq,&vtScFreq[gen-minGen],&nvtScFreq[gen-minGen],&piGen[gen-minGen],&scList,gen,&timeGen,&fitGen,&isolateGen,&countGen,popLimitFactor);
+            int reproCheck = reproduction(currentIsolates,futureIsolates,migrantPool,&cogWeights,&cogDeviations,&p,&eqFreq,&vtScFreq[gen-minGen],&nvtScFreq[gen-minGen],&piGen[gen-minGen],&scList,gen,&timeGen,&fitGen,&isolateGen,&countGen,popLimitFactor,minGen);
             if (reproCheck == 8888) {
                 std::cerr << "Population exceeded limit at generation " << gen << std::endl;
                 // continue iterations to ensure fitting statistics still incremented

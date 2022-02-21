@@ -958,7 +958,7 @@ int getStartingIsolates(std::vector<isolate*> *pop,struct parms *sp,std::vector<
             
             (*isolates_for_seeding)[0] = *possibleFirst_unsampled;
 //            isolates_for_seeding[0] = possibleFirst_unsampled;
-            unseen_sc.push_back(0);
+//            unseen_sc.push_back(0);
             
         } else {
             
@@ -1006,6 +1006,11 @@ int getStartingIsolates(std::vector<isolate*> *pop,struct parms *sp,std::vector<
                 } else {
                     (*isolates_for_seeding)[0] = (*isolatesByTime)[0];
                 }
+                // Check possible seed isolates were found
+                if ((*isolates_for_seeding)[0].size() == 0) {
+                    std::cerr << "No possible seed isolates found" << std::endl;
+                    return 1;
+                }
             // Split by time and strain
             } else if (sp->immigrationType == 3) {
                 // split population for immigration by time
@@ -1046,7 +1051,7 @@ int getStartingIsolates(std::vector<isolate*> *pop,struct parms *sp,std::vector<
                     std::cerr << "Unable to split population by SC for time " << std::endl;
                     return 1;
                 }
-                // add to main data structrue here
+                // add to main data structure here
                 if (minGen < 0) {
                     for (int gen = 0; gen < (0-minGen); gen++) {
                         if ((*isolatesByTimeAndSc)[gen].size() > 0) {
@@ -1056,50 +1061,67 @@ int getStartingIsolates(std::vector<isolate*> *pop,struct parms *sp,std::vector<
                                     (*isolates_for_seeding)[strain_index].push_back(isolate_for_seeding);
                                     
                                 }
-                                std::cout << "here" << std::endl;
                             }
                         }
                     }
+                } else {
+                    *isolates_for_seeding = (*isolatesByTimeAndSc)[0];
+                }
+                // Check possible seed isolates were found
+                int max_strain_size = 0;
+                for (int strain_index = 0; strain_index < (*isolates_for_seeding).size(); strain_index++) {
+                    if ((*isolates_for_seeding)[strain_index].size() > max_strain_size) {
+                        max_strain_size = (*isolates_for_seeding)[strain_index].size();
+                        break;
+                    }
+                }
+                if (max_strain_size == 0) {
+                    std::cerr << "No possible seed isolates found" << std::endl;
+                    return 1;
                 }
             }
             
             // iterate through strains - only add in strains that were not observed in the starting
-            // population
-            std::vector<isolate*>::iterator first_iter;
-            for (int strain_index = 0; strain_index < scList->size(); strain_index++) {
-                // first check whether the strain has been observed at the starting timepoint
-                int sc = (*scList)[strain_index];
-                bool seen = 0;
-                for (first_iter = possibleFirst->begin(), possibleFirst->end() ; first_iter != possibleFirst->end(); ++first_iter) {
-                    if ((*first_iter)->sc == sc) {
-                        seen = 1;
-                        break;
+            // population - in modes 1 and 3
+            if (sp->immigrationType == 1 || sp->immigrationType == 3) {
+                std::vector<isolate*>::iterator first_iter;
+                for (int strain_index = 0; strain_index < scList->size(); strain_index++) {
+                    // first check whether the strain has been observed at the starting timepoint
+                    int sc = (*scList)[strain_index];
+                    bool seen = 0;
+                    for (first_iter = possibleFirst->begin(), possibleFirst->end() ; first_iter != possibleFirst->end(); ++first_iter) {
+                        if ((*first_iter)->sc == sc) {
+                            seen = 1;
+                            break;
+                        }
                     }
-                }
-                
-                // to maintain consistency with definition above, use all pre-vaccine strains
-                // when such samples are available
-                // only consider the cases where there are multiple pre-vaccine generations
-//                if (minGen < -1) {
                     
-//                    for (int pv_gen = 1; pv_gen < (0-minGen); pv_gen++) {
-//                        if (isolates_for_seeding[pv_gen].size() > 0) {
-//                            if (!isolates_for_seeding[pv_gen][strain_index].empty()) {
-//                                for (int isolate_index = 0; isolate_index < isolates_for_seeding[pv_gen][strain_index].size(); isolate_index++) {
-//                                    isolates_for_seeding[0][strain_index].push_back(isolates_for_seeding[pv_gen][strain_index][isolate_index]);
-//                                }
-//                            }
-//                        }
-//                    }
-//                }
-                
-                // then add unseen strains
-                if (!seen) {
-                    // check whether strain is observed in later timesteps
-                    if ((*isolates_for_seeding)[strain_index].size() > 0) {
-                        unseen_sc.push_back(strain_index);
+                    // to maintain consistency with definition above, use all pre-vaccine strains
+                    // when such samples are available
+                    // only consider the cases where there are multiple pre-vaccine generations
+    //                if (minGen < -1) {
+                        
+    //                    for (int pv_gen = 1; pv_gen < (0-minGen); pv_gen++) {
+    //                        if (isolates_for_seeding[pv_gen].size() > 0) {
+    //                            if (!isolates_for_seeding[pv_gen][strain_index].empty()) {
+    //                                for (int isolate_index = 0; isolate_index < isolates_for_seeding[pv_gen][strain_index].size(); isolate_index++) {
+    //                                    isolates_for_seeding[0][strain_index].push_back(isolates_for_seeding[pv_gen][strain_index][isolate_index]);
+    //                                }
+    //                            }
+    //                        }
+    //                    }
+    //                }
+                    
+                    // then add unseen strains
+                    if (!seen) {
+                        // check whether strain is observed in later timesteps
+                        if ((*isolates_for_seeding)[strain_index].size() > 0) {
+                            unseen_sc.push_back(strain_index);
+                        }
                     }
                 }
+            } else {
+                unseen_sc.push_back(0);
             }
             
             // iterate up to the determined sample size
@@ -1293,7 +1315,7 @@ std::vector<int> getValidStrains(std::vector<std::vector<isolate*> > migrantInpu
     
 }
 
-int reproduction(std::vector<isolate*> *currentIsolates,std::vector<isolate*> *futureIsolates,std::vector<std::vector<std::vector<isolate*> > > *migrantPool, std::vector<double> *cogWeights, std::vector<double> *cogDeviations,struct parms *sp, std::vector<double> * ef, std::vector<int> * vtScFreq,std::vector<int> * nvtScFreq,std::vector<double> * piGen,std::vector<int> *scList, int gen,std::vector<double> * timeGen,std::vector<double> * fitGen,std::vector<std::string> * isolateGen,std::vector<int> * countGen, double popLimitFactor) {
+int reproduction(std::vector<isolate*> *currentIsolates,std::vector<isolate*> *futureIsolates,std::vector<std::vector<std::vector<isolate*> > > *migrantPool, std::vector<double> *cogWeights, std::vector<double> *cogDeviations,struct parms *sp, std::vector<double> * ef, std::vector<int> * vtScFreq,std::vector<int> * nvtScFreq,std::vector<double> * piGen,std::vector<int> *scList, int gen,std::vector<double> * timeGen,std::vector<double> * fitGen,std::vector<std::string> * isolateGen,std::vector<int> * countGen, double popLimitFactor, int minGen) {
     
     // calculate population limit for memory management
     int popLimit = round(popLimitFactor * double(sp->popSize));
@@ -1414,16 +1436,16 @@ int reproduction(std::vector<isolate*> *currentIsolates,std::vector<isolate*> *f
     
     // if mode == 2 immigration, chose the timestep
     // from which to select the migrants
-    int migration_gen = 0;
+    int migration_gen = -1;
     if (sp->immigrationType == 2) {
-        for (int g = 0; g <= gen; g++) {
+        for (int g = 0; g <= gen-minGen; g++) {
             std::vector<isolate*> *tmp_candidates = &(*migrantPool)[0][g];
             if (tmp_candidates->size() >= 1) {
                 migration_gen = g;
             }
         }
     } else if (sp->immigrationType == 3) {
-        for (int g = 0; g <= gen; g++) {
+        for (int g = 0; g <= gen-minGen; g++) {
             std::vector<std::vector<isolate*> > *tmp_candidates = &(*migrantPool)[g];
             if (tmp_candidates->size() >= 1) {
                 migration_gen = g;
@@ -1444,14 +1466,21 @@ int reproduction(std::vector<isolate*> *currentIsolates,std::vector<isolate*> *f
             int selectedScIndex = int(double(gsl_rng_uniform(rgen))*migrantStrains.size());
             candidates = &(*migrantPool)[0][migrantStrains[selectedScIndex]];
             selection = int(double(gsl_rng_uniform(rgen))*candidates->size());
-        } else if (sp->immigrationType == 2) {
-            candidates = &(*migrantPool)[0][migration_gen];
-            selection = int(double(gsl_rng_uniform(rgen))*candidates->size());
-        } else if (sp->immigrationType == 3) {
-            std::vector<int> migrantStrains = getValidStrains((*migrantPool)[migration_gen]);
-            int selectedScIndex = int(double(gsl_rng_uniform(rgen))*migrantStrains.size());
-            candidates = &(*migrantPool)[migration_gen][migrantStrains[selectedScIndex]];
-            selection = int(double(gsl_rng_uniform(rgen))*candidates->size());
+        } else if (sp->immigrationType == 2 || sp->immigrationType == 3) {
+            if (migration_gen == -1) {
+                std::cerr << "No migrant genotypes available at generation " << gen << std::endl;
+                return 1;
+            } else {
+                if (sp->immigrationType == 2) {
+                    candidates = &(*migrantPool)[0][migration_gen];
+                    selection = int(double(gsl_rng_uniform(rgen))*candidates->size());
+                } else if (sp->immigrationType == 3) {
+                    std::vector<int> migrantStrains = getValidStrains((*migrantPool)[migration_gen]);
+                    int selectedScIndex = int(double(gsl_rng_uniform(rgen))*migrantStrains.size());
+                    candidates = &(*migrantPool)[migration_gen][migrantStrains[selectedScIndex]];
+                    selection = int(double(gsl_rng_uniform(rgen))*candidates->size());
+                }
+            }
 
         } else {
             return 1;
