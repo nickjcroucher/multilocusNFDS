@@ -948,8 +948,8 @@ int getStartingIsolates(std::vector<isolate*> *pop,struct parms *sp,std::vector<
         std::vector< std::vector<isolate*> > *isolates_for_seeding = new std::vector<std::vector<isolate*> >(scList->size(),std::vector<isolate*>());
         
         // calculate the number of unsampled bacteria to add
-        float p = 0.5; // probability of not sampling the cumulative total of undetected genotypes
-        float upper_freq = 1.0 - exp(log(p)/float(first_sample_size));
+        // seedStartingPopulation is the probability of not sampling each undetected genotype
+        float upper_freq = 1.0 - exp(log(seedStartingPopulation)/float(first_sample_size));
         int number_of_unsampled_bacteria = round(upper_freq*psize);
         std::vector< int > unseen_sc;
         
