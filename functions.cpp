@@ -146,7 +146,7 @@ int parseInputFile(std::vector<isolate*> *pop, std::vector<cog*> *accessoryLoci,
             }
             if (iname != "Taxon" && sample_time != -1 && sample_sc != -1 && sample_serotype.compare("noSero") != 0) {
                 std::vector<bool> sample_markers(0);
-                isolate* tmp = new isolate(sample_id,sample_time,sample_sc,sample_serotype,sample_vt,sample_latent_vt,&sample_genotype,&sample_markers);
+                isolate* tmp = new isolate(sample_id,sample_time,sample_sc,sample_serotype,sample_vt,sample_latent_vt,&sample_genotype,&sample_markers,1.0);
                 pop->push_back(tmp);
                 // record isolate information
                 samplingTimes.push_back(sample_time);
@@ -696,19 +696,62 @@ int parseOrderingFile(char* orderingFilename,std::vector<cog*> *accessoryLoci,st
         return 1;
     }
     
-    // assign weights appropriately
-    for (unsigned int cindex = 0; cindex < orderedAccessoryLoci.size(); cindex++) {
-        for (cit = accessoryLoci->begin(), accessoryLoci->end(); cit != accessoryLoci->end(); ++cit) {
-            if ((*cit)->id.compare(orderedAccessoryLoci[cindex]) == 0) {
-                if ((float(cindex)/float(orderedAccessoryLoci.size())) <= (1.0-sp->selectedProp)) {
-                    (*cit)->weight = sp->lowerSelection;
-                } else {
-                    (*cit)->weight = sp->higherSelection;
+    // assign weights appropriately - most conserved frequencies are at the END of the list
+    unsigned int cindex = 0;
+    if (sp->het_mode == "l") { // logistic
+        double max_value = sp->lowerSelection + 1.0 / (1.0 + exp(-1.0 * sp->decayRate * (float(accessoryLoci->size()) - (1 - sp->selectedProp) * float(accessoryLoci->size()))));
+        for (unsigned int cindex = 0; cindex < orderedAccessoryLoci.size(); cindex++) {
+            for (cit = accessoryLoci->begin(), accessoryLoci->end(); cit != accessoryLoci->end(); ++cit) {
+                if ((*cit)->id.compare(orderedAccessoryLoci[cindex]) == 0) {
+                    double relative_weight_from_order = (sp->lowerSelection + 1.0 / (1.0 + exp(-1.0 * sp->decayRate * (float(cindex) + 1.0 - (1 - sp->selectedProp) * float(accessoryLoci->size()))))) * (1 / max_value);
+                    (*cit)->weight = sp->higherSelection * relative_weight_from_order;
+                    break;
                 }
             }
         }
+    } else if (sp->het_mode == "e") { // exponential
+        double max_value = sp->lowerSelection + exp(-1 * sp->decayRate * 0.0);
+        for (unsigned int cindex = 0; cindex < orderedAccessoryLoci.size(); cindex++) {
+            for (cit = accessoryLoci->begin(), accessoryLoci->end(); cit != accessoryLoci->end(); ++cit) {
+                if ((*cit)->id.compare(orderedAccessoryLoci[cindex]) == 0) {
+                    double relative_weight_from_order = (sp->lowerSelection + exp(-1 * sp->decayRate * float(accessoryLoci->size() - cindex - 1))) * (1 / max_value);
+                    (*cit)->weight = sp->higherSelection * relative_weight_from_order;
+                    break;
+                }
+            }
+        }
+    } else if (sp->het_mode == "r") { // linear
+        double max_value = sp->lowerSelection + 1;
+        for (unsigned int cindex = 0; cindex < orderedAccessoryLoci.size(); cindex++) {
+            for (cit = accessoryLoci->begin(), accessoryLoci->end(); cit != accessoryLoci->end(); ++cit) {
+                if ((*cit)->id.compare(orderedAccessoryLoci[cindex]) == 0) {
+                    double relative_weight_from_order = sp->lowerSelection + 1 - (float(accessoryLoci->size() - cindex - 1) * sp->decayRate);
+                    relative_weight_from_order = relative_weight_from_order * (1 / max_value);
+                    if (relative_weight_from_order < 0.0) {
+                        relative_weight_from_order = 0.0;
+                    }
+                    (*cit)->weight = sp->higherSelection * relative_weight_from_order;
+                    break;
+                }
+            }
+        }
+    } else if (sp->het_mode == "s") { // step
+        for (unsigned int cindex = 0; cindex < orderedAccessoryLoci.size(); cindex++) {
+            for (cit = accessoryLoci->begin(), accessoryLoci->end(); cit != accessoryLoci->end(); ++cit) {
+                if ((*cit)->id.compare(orderedAccessoryLoci[cindex]) == 0) {
+                    if ((float(cindex)/float(orderedAccessoryLoci.size())) <= (1.0-sp->selectedProp)) {
+                        (*cit)->weight = sp->lowerSelection;
+                    } else {
+                        (*cit)->weight = sp->higherSelection;
+                    }
+                    break;
+                }
+            }
+        }
+    } else {
+        std::cerr << "Allowed heterogeneous functions are (l)ogistic, (e)xponential, linea(r) and (s)tep" << std::endl;
+        exit(1);
     }
-    
     return 0;
 }
 
@@ -832,20 +875,15 @@ int dividePopulationForImmigration(std::vector<isolate*> *pop,std::vector <int> 
 
 int dividePopulationForImmigrationByTime(std::vector<isolate*> *pop, int minGen, int numGen,std::vector<std::vector<isolate*> > *popByTime) {
     
-//    std::vector<isolate*> *tmpStrains(numGen) = new std::vector<isolate*>;
-//    std::vector<std::vector<isolate*> > tmpStrains = new std::vector<std::vector<isolate*> >;
+
     std::vector<std::vector<isolate*> > tmpStrains(numGen+1);
 
     std::vector<isolate*>::iterator cit;
     for (cit = pop->begin(), pop->end(); cit != pop->end(); ++cit) {
         for (int t = 0; t <= numGen; t++) {
-//            std::cerr << "Isolate " << (*cit)->year << " ";
-            if (((*cit)->year)-minGen <= numGen && ((*cit)->year)-minGen >= 0) {
+            if (((*cit)->year)-minGen <= numGen) { // && ((*cit)->year)-minGen >= 0) {
                 if (((*cit)->year)-minGen == t) {
-//                    popByTime[t].push_back((*cit));
                     tmpStrains[t].push_back((*cit));
-//                    std::cerr << "Time: " << t << " size: " << tmpStrains[t].size() << std::endl;
-//                    std::cerr << " found in: " << t << std::endl;
                 }
             }
         }
@@ -857,34 +895,248 @@ int dividePopulationForImmigrationByTime(std::vector<isolate*> *pop, int minGen,
     
 }
 
-
 ///////////////////////////
 // get first year sample //
 ///////////////////////////
 
-int getStartingIsolates(std::vector<isolate*> *pop,std::vector<isolate*> *first,std::vector<cog*> *accessoryLoci,int psize,std::vector<double> &eqFreq,std::vector<double> &cogWeights,std::vector<double> &cogDeviations,std::vector<int> &startingVtScFrequencies,std::vector<int> &startingNvtScFrequencies,std::vector<int> &scList, int minGen) {
+int getStartingIsolates(std::vector<isolate*> *pop,struct parms *sp,std::vector<isolate*> *first,std::vector<cog*> *accessoryLoci,int psize,std::vector<double> &eqFreq,std::vector<double> &cogWeights,std::vector<double> &cogDeviations,std::vector<int> &startingVtScFrequencies,std::vector<int> &startingNvtScFrequencies,std::vector<int> *scList, int minGen, float seedStartingPopulation, char* migrantFilename, std::vector<isolate*> *migrant_population, int maxScNum) {
     
     // get all isolates observed in the pre- or peri-vaccine samples
     std::vector<isolate*> *possibleFirst = new std::vector<isolate*>;
+    std::vector<isolate*> *possibleFirst_unsampled = new std::vector<isolate*>;
     std::vector<isolate*>::iterator iter;
+    std::vector<int> observedVtSc;
+    std::vector<int> observedNvtSc;
+    
+    int first_sample_size = 0;
     for (iter = pop->begin(), pop->end() ; iter != pop->end(); ++iter) {
         if (minGen < 0) {
             // Use pre-vaccine population if possible
             if ((*iter)->year < 0) {
                 possibleFirst->push_back(*iter);
+                first_sample_size++;
+            } else {
+                possibleFirst_unsampled->push_back(*iter);
             }
         } else {
             // if no pre-vaccine population, use the peri-vaccination population
             if ((*iter)->year == 0) {
                 possibleFirst->push_back(*iter);
+                first_sample_size++;
+            } else {
+                possibleFirst_unsampled->push_back(*iter);
+            }
+        }
+    }
+    
+    // add in genotypes not detected in first sample if seeding unsampled genotypes
+    if (seedStartingPopulation > 1e-6) {
+        
+        // data structure for the seeding genotypes
+        std::vector< std::vector<isolate*> > *isolates_for_seeding = new std::vector<std::vector<isolate*> >(scList->size(),std::vector<isolate*>());
+        
+        // calculate the number of unsampled bacteria to add
+        // seedStartingPopulation is the probability of not sampling each undetected genotype
+        float upper_freq = 1.0 - exp(log(seedStartingPopulation)/float(first_sample_size));
+        int number_of_unsampled_bacteria = round(upper_freq*psize);
+        std::vector< int > unseen_sc;
+        
+        // if simplest migration type, select isolates from later generations
+        if (sp->immigrationType == 0) {
+            
+            (*isolates_for_seeding)[0] = *possibleFirst_unsampled;
+//            isolates_for_seeding[0] = possibleFirst_unsampled;
+//            unseen_sc.push_back(0);
+            
+        } else {
+            
+            // migrationType == 1 - divide by strain and seed from any later timeperiod
+            // works with and without migration file
+            if (sp->immigrationType == 1) {
+                // divide population by strain
+                int divCheck = 1;
+                std::vector<std::vector<isolate*> > *isolatesBySc = new std::vector<std::vector<isolate*> >;
+                if (migrantFilename != NULL) {
+                    divCheck = dividePopulationForImmigration(migrant_population,scList,isolatesBySc,maxScNum);
+                } else {
+                    divCheck = dividePopulationForImmigration(pop,scList,isolatesBySc,maxScNum);
+                }
+                isolates_for_seeding = isolatesBySc;
+                if (divCheck != 0) {
+                    std::cerr << "Unable to split population into sequence clusters" << std::endl;
+                    return 1;
+                }
+
+            // Split by time
+            } else if (sp->immigrationType == 2) {
+                // split population for immigration by time
+                std::vector<std::vector<isolate*> > *isolatesByTime = new std::vector<std::vector<isolate*> >;
+                int divCheck = 1;
+                if (migrantFilename == NULL) {
+                    std::cerr << "Need a separate migration file when seeding the initial population with migration mode 2" << std::endl;
+                    return 1;
+                } else {
+                    divCheck = dividePopulationForImmigrationByTime(migrant_population,minGen,sp->numGen,isolatesByTime);
+                }
+                if (divCheck != 0) {
+                    std::cerr << "Unable to split population by isolation times" << std::endl;
+                    return 1;
+                }
+                // add to main data structure here
+                if (minGen < 0) {
+                    for (int gen = 0; gen < (0-minGen); gen++) {
+                        if ((*isolatesByTime)[gen].size() > 0) {
+                            for (int x = 0; x < (*isolatesByTime)[gen].size(); x++) {
+                                (*isolates_for_seeding)[0].push_back((*isolatesByTime)[gen][x]);
+                            }
+                        }
+                    }
+                } else {
+                    (*isolates_for_seeding)[0] = (*isolatesByTime)[0];
+                }
+                // Check possible seed isolates were found
+                if ((*isolates_for_seeding)[0].size() == 0) {
+                    std::cerr << "No possible seed isolates found" << std::endl;
+                    return 1;
+                }
+            // Split by time and strain
+            } else if (sp->immigrationType == 3) {
+                // split population for immigration by time
+                int divCheck = 1;
+                std::vector<std::vector<isolate*> > *populationByTime = new std::vector<std::vector<isolate*> > (sp->numGen+1, std::vector<isolate*>());
+                if (migrantFilename == NULL) {
+                    std::cerr << "Need a separate migration file when seeding the initial population with migration mode 3" << std::endl;
+                    return 1;
+                } else {
+                    divCheck = dividePopulationForImmigrationByTime(migrant_population,minGen,sp->numGen,populationByTime);
+                }
+                if (divCheck != 0) {
+                    std::cerr << "Unable to split population by isolation times" << std::endl;
+                    return 1;
+                }
+                // Split the initial population
+                std::vector<std::vector<std::vector<isolate*> > > *isolatesByTimeAndSc = new std::vector<std::vector<std::vector<isolate*> > >;
+                // then split each time point by strain
+                for (int g = 0; g <= sp->numGen; g++) {
+                    std::vector<std::vector<isolate*> > *isolatesBySc = new std::vector<std::vector<isolate*> >;
+                    if ((*populationByTime)[g].size() >= 1) {
+                        std::vector<isolate*> *tmpStrains = new std::vector<isolate*>;
+                        tmpStrains = &(*populationByTime)[g]; // needs fixing
+                        divCheck = dividePopulationForImmigration(tmpStrains,scList,isolatesBySc,maxScNum);
+                        if (divCheck != 0) {
+                            std::cerr << "Unable to split population->by SC for time " << g << std::endl;
+                            return 1;
+                        }
+                        else {
+                            isolatesByTimeAndSc->push_back(*isolatesBySc);
+                        }
+                    }
+                    else {
+                        isolatesByTimeAndSc->push_back(*isolatesBySc);
+                    }
+                }
+                if (divCheck != 0) {
+                    std::cerr << "Unable to split population by SC for time " << std::endl;
+                    return 1;
+                }
+                // add to main data structure here
+                if (minGen < 0) {
+                    for (int gen = 0; gen < (0-minGen); gen++) {
+                        if ((*isolatesByTimeAndSc)[gen].size() > 0) {
+                            for (int strain_index = 0; strain_index < scList->size(); strain_index++) {
+                                for (int x = 0; x < (*isolatesByTimeAndSc)[gen][strain_index].size(); x++) {
+                                    isolate *isolate_for_seeding = (*isolatesByTimeAndSc)[gen][strain_index][x];
+                                    (*isolates_for_seeding)[strain_index].push_back(isolate_for_seeding);
+                                    
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    *isolates_for_seeding = (*isolatesByTimeAndSc)[0];
+                }
+                // Check possible seed isolates were found
+                int max_strain_size = 0;
+                for (int strain_index = 0; strain_index < (*isolates_for_seeding).size(); strain_index++) {
+                    if ((*isolates_for_seeding)[strain_index].size() > max_strain_size) {
+                        max_strain_size = (*isolates_for_seeding)[strain_index].size();
+                        break;
+                    }
+                }
+                if (max_strain_size == 0) {
+                    std::cerr << "No possible seed isolates found" << std::endl;
+                    return 1;
+                }
+            }
+            
+            // iterate through strains - only add in strains that were not observed in the starting
+            // population - in modes 1 and 3
+            if (sp->immigrationType == 1 || sp->immigrationType == 3) {
+                std::vector<isolate*>::iterator first_iter;
+                for (int strain_index = 0; strain_index < scList->size(); strain_index++) {
+                    // first check whether the strain has been observed at the starting timepoint
+                    int sc = (*scList)[strain_index];
+                    bool seen = 0;
+                    for (first_iter = possibleFirst->begin(), possibleFirst->end() ; first_iter != possibleFirst->end(); ++first_iter) {
+                        if ((*first_iter)->sc == sc) {
+                            seen = 1;
+                            break;
+                        }
+                    }
+                    
+                    // to maintain consistency with definition above, use all pre-vaccine strains
+                    // when such samples are available
+                    // only consider the cases where there are multiple pre-vaccine generations
+    //                if (minGen < -1) {
+                        
+    //                    for (int pv_gen = 1; pv_gen < (0-minGen); pv_gen++) {
+    //                        if (isolates_for_seeding[pv_gen].size() > 0) {
+    //                            if (!isolates_for_seeding[pv_gen][strain_index].empty()) {
+    //                                for (int isolate_index = 0; isolate_index < isolates_for_seeding[pv_gen][strain_index].size(); isolate_index++) {
+    //                                    isolates_for_seeding[0][strain_index].push_back(isolates_for_seeding[pv_gen][strain_index][isolate_index]);
+    //                                }
+    //                            }
+    //                        }
+    //                    }
+    //                }
+                    
+                    // then add unseen strains
+                    if (!seen) {
+                        // check whether strain is observed in later timesteps
+                        if ((*isolates_for_seeding)[strain_index].size() > 0) {
+                            unseen_sc.push_back(strain_index);
+                        }
+                    }
+                }
+            } else {
+                unseen_sc.push_back(0);
+            }
+            
+            // iterate up to the determined sample size
+            for (int index = 0; index < unseen_sc.size(); index++) {
+                int unseen_strain_index = unseen_sc[index];
+                int unseen_sc_number = (*scList)[unseen_strain_index];
+                for (int unsampled_index = 0; unsampled_index < number_of_unsampled_bacteria; unsampled_index++) {
+                    int selection = int(double(gsl_rng_uniform(rgen))*int((*isolates_for_seeding)[unseen_strain_index].size()));
+                    isolate *selected_isolate = (*isolates_for_seeding)[unseen_strain_index][selection];
+                    first->push_back(selected_isolate);
+                    // record sequence clusters
+                    if (selected_isolate->vt) {
+                        observedVtSc.push_back(selected_isolate->sc);
+                    } else {
+                        observedNvtSc.push_back(selected_isolate->sc);
+                    }
+                    // calculate gene frequencies
+                    for (unsigned int i = 0; i < selected_isolate->genotype.size();i++) {
+                        (*accessoryLoci)[i]->simFreq[0]+=(double(selected_isolate->genotype[i])/double(psize));
+                    }
+                }
             }
         }
     }
     
     // fill first timepoint with random sample of isolates from pre-/peri-vaccination samples
     // record starting COG frequencies
-    std::vector<int> observedVtSc;
-    std::vector<int> observedNvtSc;
     while (first->size() < unsigned(psize)) {
         //int selection = rand()%possibleFirst.size();
         int selection = int(double(gsl_rng_uniform(rgen))*int(possibleFirst->size()));
@@ -902,9 +1154,9 @@ int getStartingIsolates(std::vector<isolate*> *pop,std::vector<isolate*> *first,
     }
     
     // record sequence cluster statistics
-    for (unsigned int i = 0; i < scList.size(); ++i) {
-        startingVtScFrequencies[i] = std::count(observedVtSc.begin(),observedVtSc.end(),scList[i]);
-        startingNvtScFrequencies[i] = std::count(observedNvtSc.begin(),observedNvtSc.end(),scList[i]);
+    for (unsigned int i = 0; i < scList->size(); ++i) {
+        startingVtScFrequencies[i] = std::count(observedVtSc.begin(),observedVtSc.end(),(*scList)[i]);
+        startingNvtScFrequencies[i] = std::count(observedNvtSc.begin(),observedNvtSc.end(),(*scList)[i]);
     }
     
     // record gene frequency statistics
@@ -1051,7 +1303,7 @@ std::vector<int> getValidStrains(std::vector<std::vector<isolate*> > migrantInpu
     
 }
 
-int reproduction(std::vector<isolate*> *currentIsolates,std::vector<isolate*> *futureIsolates,std::vector<std::vector<std::vector<isolate*> > > *migrantPool, std::vector<double> *cogWeights, std::vector<double> *cogDeviations,struct parms *sp, std::vector<double> * ef, std::vector<int> * vtScFreq,std::vector<int> * nvtScFreq,std::vector<double> * piGen,std::vector<int> *scList, int gen,std::vector<double> * timeGen,std::vector<double> * fitGen,std::vector<std::string> * isolateGen,std::vector<int> * countGen, double popLimitFactor) {
+int reproduction(std::vector<isolate*> *currentIsolates,std::vector<isolate*> *futureIsolates,std::vector<std::vector<std::vector<isolate*> > > *migrantPool, std::vector<double> *cogWeights, std::vector<double> *cogDeviations,struct parms *sp, std::vector<double> * ef, std::vector<int> * vtScFreq,std::vector<int> * nvtScFreq,std::vector<double> * piGen,std::vector<int> *scList, int gen,std::vector<double> * timeGen,std::vector<double> * fitGen,std::vector<std::string> * isolateGen,std::vector<int> * countGen, double popLimitFactor, int minGen) {
     
     // calculate population limit for memory management
     int popLimit = round(popLimitFactor * double(sp->popSize));
@@ -1070,8 +1322,8 @@ int reproduction(std::vector<isolate*> *currentIsolates,std::vector<isolate*> *f
     int genotypeCount = 0;
     
     // basic reproduction number based on immigration and population size
-    double baseR = (1-sp->immigrationRate)*(double(sp->popSize)/double(currentIsolates->size()));
-    
+    double baseR = (1-sp->immigrationRate);
+
     // sort current population
     std::vector<isolate*>::iterator iter;
     std::sort(currentIsolates->begin(),currentIsolates->end());
@@ -1080,6 +1332,10 @@ int reproduction(std::vector<isolate*> *currentIsolates,std::vector<isolate*> *f
     std::string oldId = "";
     double oldFitness = 0.0;
     
+    // Store non-standardised fitnesses
+    std::vector<double> unstandardised_fitnesses;
+    
+    // Calculate non-standardised fitnesses
     for (iter = currentIsolates->begin(), currentIsolates->end(); iter != currentIsolates->end(); ++iter) {
         
         // calculate fitness of each new genotype in population
@@ -1110,11 +1366,31 @@ int reproduction(std::vector<isolate*> *currentIsolates,std::vector<isolate*> *f
             double overallFitness = baseR*vaccineFit*freqDepFit;
             oldFitness = overallFitness;
             oldId = (*iter)->id;
-            
         }
         
-        // select offspring by Poisson distribution
-        int progeny = gsl_ran_poisson(rgen,oldFitness);
+        (*iter)->fitness = oldFitness;
+        unstandardised_fitnesses.push_back(oldFitness);
+        
+    }
+    
+    // Standardise fitnesses for density dependent-regulation
+    double standardisation_factor = 1.0;
+    if (sp->densdepMode == 0) {
+        standardisation_factor = double(sp->popSize)/double(currentIsolates->size());
+    } else if (sp->densdepMode == 1) {
+        double densdep = double(sp->popSize)/double(currentIsolates->size());
+        double mean_unstandardised_fitness = std::accumulate(unstandardised_fitnesses.begin(),
+                                                             unstandardised_fitnesses.end(),
+                                                             0.0)/unstandardised_fitnesses.size();
+        standardisation_factor = densdep/mean_unstandardised_fitness;
+    } else {
+        std::cerr << "Unrecognsised densdep mode: " << sp->densdepMode << std::endl;
+    }
+    
+    // select offspring by Poisson distribution using standardised fitness
+    for (iter = currentIsolates->begin(), currentIsolates->end(); iter != currentIsolates->end(); ++iter) {
+
+        int progeny = gsl_ran_poisson(rgen,standardisation_factor * (*iter)->fitness);
         for (int p = 0; p < progeny; p++) {
             futureIsolates->push_back((*iter));
             // record statistics
@@ -1148,16 +1424,16 @@ int reproduction(std::vector<isolate*> *currentIsolates,std::vector<isolate*> *f
     
     // if mode == 2 immigration, chose the timestep
     // from which to select the migrants
-    int migration_gen = 0;
+    int migration_gen = -1;
     if (sp->immigrationType == 2) {
-        for (int g = 0; g <= gen; g++) {
+        for (int g = 0; g <= gen-minGen; g++) {
             std::vector<isolate*> *tmp_candidates = &(*migrantPool)[0][g];
             if (tmp_candidates->size() >= 1) {
                 migration_gen = g;
             }
         }
     } else if (sp->immigrationType == 3) {
-        for (int g = 0; g <= gen; g++) {
+        for (int g = 0; g <= gen-minGen; g++) {
             std::vector<std::vector<isolate*> > *tmp_candidates = &(*migrantPool)[g];
             if (tmp_candidates->size() >= 1) {
                 migration_gen = g;
@@ -1178,14 +1454,21 @@ int reproduction(std::vector<isolate*> *currentIsolates,std::vector<isolate*> *f
             int selectedScIndex = int(double(gsl_rng_uniform(rgen))*migrantStrains.size());
             candidates = &(*migrantPool)[0][migrantStrains[selectedScIndex]];
             selection = int(double(gsl_rng_uniform(rgen))*candidates->size());
-        } else if (sp->immigrationType == 2) {
-            candidates = &(*migrantPool)[0][migration_gen];
-            selection = int(double(gsl_rng_uniform(rgen))*candidates->size());
-        } else if (sp->immigrationType == 3) {
-            std::vector<int> migrantStrains = getValidStrains((*migrantPool)[migration_gen]);
-            int selectedScIndex = int(double(gsl_rng_uniform(rgen))*migrantStrains.size());
-            candidates = &(*migrantPool)[migration_gen][migrantStrains[selectedScIndex]];
-            selection = int(double(gsl_rng_uniform(rgen))*candidates->size());
+        } else if (sp->immigrationType == 2 || sp->immigrationType == 3) {
+            if (migration_gen == -1) {
+                std::cerr << "No migrant genotypes available at generation " << gen << std::endl;
+                return 1;
+            } else {
+                if (sp->immigrationType == 2) {
+                    candidates = &(*migrantPool)[0][migration_gen];
+                    selection = int(double(gsl_rng_uniform(rgen))*candidates->size());
+                } else if (sp->immigrationType == 3) {
+                    std::vector<int> migrantStrains = getValidStrains((*migrantPool)[migration_gen]);
+                    int selectedScIndex = int(double(gsl_rng_uniform(rgen))*migrantStrains.size());
+                    candidates = &(*migrantPool)[migration_gen][migrantStrains[selectedScIndex]];
+                    selection = int(double(gsl_rng_uniform(rgen))*candidates->size());
+                }
+            }
 
         } else {
             return 1;
@@ -1376,7 +1659,7 @@ int recombination(std::vector<isolate*> *currentIsolates,std::vector<isolate*> *
                 
                 // store in new population
                 
-                isolate* tmp = new isolate(new_id,recipient.year,recipient.sc,recipient.serotype,recipient.vt,recipient.latent_vt,&recipient.genotype,&recipient.markers);
+                isolate* tmp = new isolate(new_id,recipient.year,recipient.sc,recipient.serotype,recipient.vt,recipient.latent_vt,&recipient.genotype,&recipient.markers,recipient.fitness);
                 futureIsolates->push_back(tmp);
                 
             } else {

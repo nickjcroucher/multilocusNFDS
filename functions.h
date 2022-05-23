@@ -71,7 +71,7 @@ int dividePopulationForImmigration(std::vector<isolate*> *pop,std::vector<int> *
 int dividePopulationForImmigrationByTime(std::vector<isolate*> *pop, int minGen, int numgen,std::vector<std::vector<isolate*> > *popByTime);
 
 // get isolates for starting population
-int getStartingIsolates(std::vector<isolate*> *pop,std::vector<isolate*> *first,std::vector<cog*> *accessoryLoci, int,std::vector<double> &eqFreq,std::vector<double> &cogWeights,std::vector<double> &cogDeviations,std::vector<int> &startingVtScFrequencies,std::vector<int> &startingNvtScFrequencies,std::vector<int> &scList, int minGen);
+int getStartingIsolates(std::vector<isolate*> *pop,struct parms *sp,std::vector<isolate*> *first,std::vector<cog*> *accessoryLoci, int,std::vector<double> &eqFreq,std::vector<double> &cogWeights,std::vector<double> &cogDeviations,std::vector<int> &startingVtScFrequencies,std::vector<int> &startingNvtScFrequencies,std::vector<int> *scList, int minGen, float seedStartingPopulation, char* migrantFilename, std::vector<isolate*> *migrant_population, int maxScNum);
 
 // sample selected from first generation
 int firstSample(std::vector<isolate*> *currentIsolates,int firstSample,std::ofstream& sampleOutFile,int minGen);
@@ -90,7 +90,7 @@ int alterVaccineFormulation(std::vector<isolate*> *currentIsolates,std::vector<i
 //////////////////////////////
 
 // select next generation
-int reproduction(std::vector<isolate*> *currentIsolates,std::vector<isolate*> *futureIsolates,std::vector<std::vector<std::vector<isolate*> > > *migrantPool,std::vector<double> *cogWeights,std::vector<double> *cogDeviations,struct parms *sp, std::vector<double> * ef, std::vector<int> * vtScFreq,std::vector<int> * nvtScFreq,std::vector<double> * piGen,std::vector<int> *scList, int gen,std::vector<double> * timeGen,std::vector<double> * fitGen,std::vector<std::string> * isolateGen,std::vector<int> * countGen, double popLimitFactor);
+int reproduction(std::vector<isolate*> *currentIsolates,std::vector<isolate*> *futureIsolates,std::vector<std::vector<std::vector<isolate*> > > *migrantPool,std::vector<double> *cogWeights,std::vector<double> *cogDeviations,struct parms *sp, std::vector<double> * ef, std::vector<int> * vtScFreq,std::vector<int> * nvtScFreq,std::vector<double> * piGen,std::vector<int> *scList, int gen,std::vector<double> * timeGen,std::vector<double> * fitGen,std::vector<std::string> * isolateGen,std::vector<int> * countGen, double popLimitFactor, int minGen);
 
 // recombination
 int recombination(std::vector<isolate*> *currentIsolates,std::vector<isolate*> *futureIsolates,char* markerFilename,double transformationProportion,double transformationRate,double transformationAsymmetryLoci, double transformationAsymmetryMarker);

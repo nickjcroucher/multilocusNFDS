@@ -46,6 +46,9 @@ int main(int argc, char * argv[]) {
     p.transformationAsymmetryLoci = 1.0;
     p.transformationAsymmetryMarker = 1;
     p.genotypeSampleSize = 0;
+    p.decayRate = 0.01;
+    p.het_mode = "s";
+    p.densdepMode = 0;
     
     ////////////////////////
     // Parse command line //
@@ -65,13 +68,14 @@ int main(int argc, char * argv[]) {
     double popLimitFactor = -1.0;
     bool migrantEvolution = 0;
     bool zeroTimeSelection = 0;
-    
+    float seedStartingPopulation = 0.0;
+
     if (argc == 1) {
         usage(argv[0]);
         return 1;
     } else {
         int opt = 0;
-        while ((opt = getopt(argc,argv,"Ehc:p:s:v:i:t:n:g:u:l:y:j:k:f:x:w:r:o:m:z:e:a:b:d:q:F:1:2:0")) != EOF) {
+        while ((opt = getopt(argc,argv,"Ehc:p:s:v:i:t:n:g:u:l:y:j:k:f:x:w:r:o:m:z:e:a:b:d:q:F:1:2:0:H:D:M:S:")) != EOF) {
             switch (opt) {
                 case 'h':
                     usage(argv[0]);
@@ -159,6 +163,7 @@ int main(int argc, char * argv[]) {
                     break;
                 case 'E':
                     migrantEvolution = 1;
+                    break;
                 case 'd':
                     p.genotypeSampleSize = atoi(optarg);
                     break;
@@ -170,6 +175,18 @@ int main(int argc, char * argv[]) {
                     break;
                 case 'F':
                     popLimitFactor = atof(optarg);
+                    break;
+                case 'H':
+                    p.het_mode = (*optarg);
+                    break;
+                case 'D':
+                    p.decayRate = atof(optarg);
+                    break;
+                case 'M':
+                    p.densdepMode = atoi(optarg);
+                    break;
+                case 'S':
+                    seedStartingPopulation = atof(optarg);
                     break;
             }
         }
@@ -368,7 +385,22 @@ int main(int argc, char * argv[]) {
     
     // initialise population in first generation, record simulated population statistics
     int gen = minGen;
-    int initialiseCheck = getStartingIsolates(population,currentIsolates,accessoryLoci,p.popSize,eqFreq,cogWeights,cogDeviations, vtScFreq[0],nvtScFreq[0],scList,minGen);
+    int initialiseCheck = getStartingIsolates(population,
+                                              &p,
+                                              currentIsolates,
+                                              accessoryLoci,
+                                              p.popSize,
+                                              eqFreq,
+                                              cogWeights,
+                                              cogDeviations,
+                                              vtScFreq[0],
+                                              nvtScFreq[0],
+                                              &scList,
+                                              minGen,
+                                              seedStartingPopulation,
+                                              migrantFilename,
+                                              migrant_population,
+                                              maxScNum);
     if (initialiseCheck != 0) {
         std::cerr << "Unable to initialise population" << std::endl;
         usage(argv[0]);
@@ -519,7 +551,7 @@ int main(int argc, char * argv[]) {
             }
             
             // allow cells to reproduce and update COG deviations array
-            int reproCheck = reproduction(currentIsolates,futureIsolates,migrantPool,&cogWeights,&cogDeviations,&p,&eqFreq,&vtScFreq[gen-minGen],&nvtScFreq[gen-minGen],&piGen[gen-minGen],&scList,gen,&timeGen,&fitGen,&isolateGen,&countGen,popLimitFactor);
+            int reproCheck = reproduction(currentIsolates,futureIsolates,migrantPool,&cogWeights,&cogDeviations,&p,&eqFreq,&vtScFreq[gen-minGen],&nvtScFreq[gen-minGen],&piGen[gen-minGen],&scList,gen,&timeGen,&fitGen,&isolateGen,&countGen,popLimitFactor,minGen);
             if (reproCheck == 8888) {
                 std::cerr << "Population exceeded limit at generation " << gen << std::endl;
                 // continue iterations to ensure fitting statistics still incremented
