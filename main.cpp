@@ -388,7 +388,7 @@ int main(int argc, char * argv[]) {
     if (p.programme != "s" && p.programme != "x" && epiFilename != NULL) {
         // sample output
         diseaseOutFile.open(diseaseOutFilename,std::ios::out);
-        diseaseOutFile << "Time\tSerotype\tVT\tSC\tObserved\tSimulated" << std::endl;
+        diseaseOutFile << "Time\tCarriage\tPopulation\tInvasiveness\tSerotype\tVT\tSC\tObserved\tSimulated" << std::endl;
     }
     
     /////////////////////////////

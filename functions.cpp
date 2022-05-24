@@ -2080,7 +2080,7 @@ int compare_to_disease_data(std::vector<double> diseaseDivergence,
             int deviation = abs(simulated_disease_count - (*diseaseCount)[i]);
             total_deviation += deviation;
             // print output
-            diseaseOutFile << simulation_time << "\t" << serotype << "\t" << (*diseaseVt)[i] << "\t" << sc << "\t" << (*diseaseCount)[i] << "\t" << simulated_disease_count << std::endl;
+            diseaseOutFile << simulation_time << "\t" << carriage_frequency << "\t" << (*diseasePopulation)[i] << "\t" << (*diseaseInvasiveness)[i] << "\t" << serotype << "\t" << (*diseaseVt)[i] << "\t" << sc << "\t" << (*diseaseCount)[i] << "\t" << simulated_disease_count << std::endl;
         }
         
     }
