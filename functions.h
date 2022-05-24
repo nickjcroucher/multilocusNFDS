@@ -158,5 +158,4 @@ void tidyUpIsolates(std::vector<isolate*> *a_list, std::vector<isolate*> *b_list
 void tidyUpLoci(std::vector<cog*> *cog_list);
 
 #endif /* defined(__frequencyDependentSimulation__functions__) */
-&&
-*
+

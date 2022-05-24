@@ -2051,9 +2051,34 @@ int compare_to_disease_data(std::vector<double> diseaseDivergence,
                             std::vector<int> *diseasePopulation,
                             std::vector<int> *diseaseCount) {
     
+    // first calculate total population size for frequency calculation
+    int population_size = currentIsolates->size();
+    
+    // then iterate through strain/serotype combinations
+    double total_deviation = 0.0;
     for (unsigned int i = 0; i < diseaseTime->size(); i++) {
-        std::string serotype = (*diseaseSeroList)[i];
-        int sc = (*diseaseScList)[i];
+        // only test at the appropriate time point
+        if ((*diseaseTime)[i] == simulation_time) {
+            // get serotype and strain
+            std::string serotype = (*diseaseSeroList)[i];
+            int sc = (*diseaseScList)[i];
+            // calculate the carriage frequency of each
+            int carriage_count = 0;
+            std::vector<isolate*>::iterator iiter;
+            for (iiter = currentIsolates->begin(), currentIsolates->end(); iiter != currentIsolates->end(); ++iiter) {
+                if (sc == (*iiter)->sc && serotype == (*iiter)->serotype) {
+                    carriage_count++;
+                }
+            }
+            double carriage_frequency = ((1.0)*carriage_count)/((1.0)*population_size);
+            // calculate the Poisson variable
+            double poisson_var = carriage_frequency*(*diseasePopulation)[i]*(*diseaseInvasiveness)[i];
+            // draw from the distribution
+            int simulated_disease_count = gsl_ran_poisson(rgen,poisson_var);
+            // add deviation to the appropriate total
+            int deviation = abs(simulated_disease_count - (*diseaseCount)[i]);
+            total_deviation += deviation;
+        }
         
     }
     
