@@ -127,7 +127,8 @@ int compare_to_disease_data(std::vector<double> diseaseDivergence,
                             std::vector<int> *diseaseVt,
                             std::vector<double> *diseaseInvasiveness,
                             std::vector<int> *diseasePopulation,
-                            std::vector<int> *diseaseCount);
+                            std::vector<int> *diseaseCount,
+                            std::ofstream& diseaseOutFile);
 
 // just record sample statistics in pure simulation mode
 int justRecordStats(int gen,int minGen,int sampleSize,std::vector<isolate*> *currentIsolates,std::vector<cog*> *accessoryLoci);

@@ -2049,7 +2049,8 @@ int compare_to_disease_data(std::vector<double> diseaseDivergence,
                             std::vector<int> *diseaseVt,
                             std::vector<double> *diseaseInvasiveness,
                             std::vector<int> *diseasePopulation,
-                            std::vector<int> *diseaseCount) {
+                            std::vector<int> *diseaseCount,
+                            std::ofstream& diseaseOutFile) {
     
     // first calculate total population size for frequency calculation
     int population_size = currentIsolates->size();
@@ -2078,6 +2079,8 @@ int compare_to_disease_data(std::vector<double> diseaseDivergence,
             // add deviation to the appropriate total
             int deviation = abs(simulated_disease_count - (*diseaseCount)[i]);
             total_deviation += deviation;
+            // print output
+            diseaseOutFile << simulation_time << "\t" << serotype << "\t" << (*diseaseVt)[i] << "\t" << sc << "\t" << (*diseaseCount)[i] << "\t" << simulated_disease_count << std::endl;
         }
         
     }

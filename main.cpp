@@ -378,6 +378,18 @@ int main(int argc, char * argv[]) {
         sampleOutFile.open(sampleOutFilename,std::ios::out);
         sampleOutFile << "Taxon" << "\t" << "Time" << "\t" << "Serotype" << "\t" << "VT" << "\t" << "SC" << std::endl;
     }
+
+    ////////////////////////////////////////
+    // Open disease sampling file for comparisons //
+    ////////////////////////////////////////
+    
+    std::string diseaseOutFilename = std::string(outputFilename) + ".sample.disease.out";
+    std::ofstream diseaseOutFile;
+    if (p.programme != "s" && p.programme != "x" && epiFilename != NULL) {
+        // sample output
+        diseaseOutFile.open(diseaseOutFilename,std::ios::out);
+        diseaseOutFile << "Time\tSerotype\tVT\tSC\tObserved\tSimulated" << std::endl;
+    }
     
     /////////////////////////////
     // Select first generation //
@@ -625,7 +637,8 @@ int main(int argc, char * argv[]) {
                                                         diseaseVt,
                                                         diseaseInvasiveness,
                                                         diseasePopulation,
-                                                        diseaseCount);
+                                                        diseaseCount,
+                                                        diseaseOutFile);
                         }
                     
 //                    } else {
@@ -722,6 +735,10 @@ int main(int argc, char * argv[]) {
     if (p.programme != "s" && p.programme != "x") {
         // sample output
         sampleOutFile.close();
+        // disease output
+        if (epiFilename != NULL) {
+            diseaseOutFile.close();
+        }
     }
     
     /////////////
