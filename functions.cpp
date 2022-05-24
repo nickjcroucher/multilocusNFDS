@@ -1970,6 +1970,98 @@ int compareSamples(int gen,int minGen,int sampleSize,std::vector<isolate*> *curr
 }
 
 //////////////////////////////////////////////
+// Parse disease information //
+//////////////////////////////////////////////
+
+int parse_disease_data(char* epiFilename,
+                       std::vector<int> *diseaseTime,
+                       std::vector<std::string> *diseaseSeroList,
+                       std::vector<int> *diseaseScList,
+                       std::vector<int> *diseaseVt,
+                       std::vector<double> *diseaseInvasiveness,
+                       std::vector<int> *diseasePopulation,
+                       std::vector<int> *diseaseCount) {
+    
+    std::ifstream disease_file;
+    disease_file.open(epiFilename, std::ifstream::in);
+    if (disease_file) {
+        std::string line;
+        // parse lines
+        while (std::getline(disease_file, line)) {
+            // temporary information stores
+            int disease_time = -1;
+            std::string disease_serotype;
+            int disease_vt = -1;
+            int disease_sc = -1;
+            double disease_invasiveness = 0.0;
+            int disease_population = -1;
+            int disease_count = -1;
+            // read line by line
+            std::istringstream iss(line);
+            int sIndex = 0;
+            while (iss) {
+                std::string temp;
+                while (getline(iss, temp, '\t')) {
+                    if (sIndex == 1) {
+                        disease_time = atoi(temp.c_str());
+                    } else if (sIndex == 2) {
+                        disease_serotype = temp.c_str();
+                    } else if (sIndex == 3) {
+                        disease_vt = atoi(temp.c_str());
+                    } else if (sIndex == 4) {
+                        disease_sc = atoi(temp.c_str());
+                    } else if (sIndex == 5) {
+                        disease_invasiveness = atof(temp.c_str());
+                    } else if (sIndex == 6) {
+                        disease_population = atoi(temp.c_str());
+                    } else if (sIndex == 7) {
+                        disease_count = atoi(temp.c_str());
+                    }
+                    sIndex++;
+                }
+                if (disease_serotype != "Serotype") {
+                    diseaseTime->push_back(disease_time);
+                    diseaseSeroList->push_back(disease_serotype);
+                    diseaseScList->push_back(disease_sc);
+                    diseaseVt->push_back(disease_vt);
+                    diseaseInvasiveness->push_back(disease_invasiveness);
+                    diseasePopulation->push_back(disease_population);
+                    diseaseCount->push_back(disease_count);
+                }
+            }
+        }
+    }
+    
+    return 0;
+    
+}
+
+//////////////////////////////////////////////
+// Compare to disease samples //
+//////////////////////////////////////////////
+
+int compare_to_disease_data(std::vector<double> diseaseDivergence,
+                            int simulation_time,
+                            std::vector<isolate*> *currentIsolates,
+                            std::vector<int> *diseaseTime,
+                            std::vector<std::string> *diseaseSeroList,
+                            std::vector<int> *diseaseScList,
+                            std::vector<int> *diseaseVt,
+                            std::vector<double> *diseaseInvasiveness,
+                            std::vector<int> *diseasePopulation,
+                            std::vector<int> *diseaseCount) {
+    
+    for (unsigned int i = 0; i < diseaseTime->size(); i++) {
+        std::string serotype = (*diseaseSeroList)[i];
+        int sc = (*diseaseScList)[i];
+        
+    }
+    
+    return 0;
+    
+}
+
+//////////////////////////////////////////////
 // just record simple simulation statistics //
 //////////////////////////////////////////////
 

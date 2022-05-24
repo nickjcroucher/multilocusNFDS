@@ -69,13 +69,14 @@ int main(int argc, char * argv[]) {
     bool migrantEvolution = 0;
     bool zeroTimeSelection = 0;
     float seedStartingPopulation = 0.0;
-
+    char* epiFilename = NULL;
+    
     if (argc == 1) {
         usage(argv[0]);
         return 1;
     } else {
         int opt = 0;
-        while ((opt = getopt(argc,argv,"Ehc:p:s:v:i:t:n:g:u:l:y:j:k:f:x:w:r:o:m:z:e:a:b:d:q:F:1:2:0:H:D:M:S:")) != EOF) {
+        while ((opt = getopt(argc,argv,"Ehc:p:s:v:i:t:n:g:u:l:y:j:k:f:x:w:r:o:m:z:e:a:b:d:q:F:1:2:0:H:D:M:S:I:")) != EOF) {
             switch (opt) {
                 case 'h':
                     usage(argv[0]);
@@ -187,6 +188,9 @@ int main(int argc, char * argv[]) {
                     break;
                 case 'S':
                     seedStartingPopulation = atof(optarg);
+                    break;
+                case 'I':
+                    epiFilename = optarg;
                     break;
             }
         }
@@ -340,6 +344,29 @@ int main(int argc, char * argv[]) {
         cogWeights.push_back((*cit)->weight);
     }
     
+    // disease data for fitting to epi information
+    std::vector<int> *diseaseTime = new std::vector<int>;
+    std::vector<std::string> *diseaseSeroList = new std::vector<std::string>;
+    std::vector<int> *diseaseScList = new std::vector<int>;
+    std::vector<int> *diseaseVt = new std::vector<int>;
+    std::vector<double> *diseaseInvasiveness = new std::vector<double>;
+    std::vector<int> *diseasePopulation = new std::vector<int>;
+    std::vector<int> *diseaseCount = new std::vector<int>;
+    if (epiFilename != NULL) {
+        int epiCheck = parse_disease_data(epiFilename,
+                                          diseaseTime,
+                                          diseaseSeroList,
+                                          diseaseScList,
+                                          diseaseVt,
+                                          diseaseInvasiveness,
+                                          diseasePopulation,
+                                          diseaseCount);
+        if (epiCheck != 0) {
+            std::cerr << "Unable to parse disease epidemiology file" << std::endl;
+            return 1;
+        }
+    }
+    
     ////////////////////////////////////////
     // Open sampling file for comparisons //
     ////////////////////////////////////////
@@ -440,6 +467,7 @@ int main(int argc, char * argv[]) {
     std::vector<double> vtCogFittingStatsList;
     std::vector<double> nvtCogFittingStatsList;
     std::vector<double> strainFittingStatsList;
+    std::vector<double> diseaseFittingStatsList;
     
     // print starting population for simulation
     if (p.programme == "s") {
@@ -585,6 +613,21 @@ int main(int argc, char * argv[]) {
                             usage(argv[0]);
                             return 1;
                         }
+                        
+                        // compare to disease data if available
+                        if (epiFilename != NULL) {
+                            int disease_comparison = compare_to_disease_data(diseaseFittingStatsList,
+                                                        gen,
+                                                        currentIsolates,
+                                                        diseaseTime,
+                                                        diseaseSeroList,
+                                                        diseaseScList,
+                                                        diseaseVt,
+                                                        diseaseInvasiveness,
+                                                        diseasePopulation,
+                                                        diseaseCount);
+                        }
+                    
 //                    } else {
 //                        // add maximum value to statistics, which
 //                        // is ln(2) for JSD (observed)

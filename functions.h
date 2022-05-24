@@ -85,6 +85,16 @@ int getCogDeviations(std::vector<double> * ef,std::vector<isolate*> *currentStra
 // alter vaccine formulation
 int alterVaccineFormulation(std::vector<isolate*> *currentIsolates,std::vector<isolate*> *pop,std::vector<std::vector<std::vector<isolate*> > > *populationBySc);
 
+// parse disease data
+int parse_disease_data(char* epiFilename,
+                       std::vector<int> *diseaseTime,
+                       std::vector<std::string> *diseaseSeroList,
+                       std::vector<int> *diseaseScList,
+                       std::vector<int> *diseaseVt,
+                       std::vector<double> *diseaseInvasiveness,
+                       std::vector<int> *diseasePopulation,
+                       std::vector<int> *diseaseCount);
+
 //////////////////////////////
 // Per-generation functions //
 //////////////////////////////
@@ -106,6 +116,18 @@ int updatePopulation(std::vector<isolate*> *pop,std::vector<isolate*> *new_pop);
 
 // compare samples
 int compareSamples(int gen,int minGen,int sampleSize,std::vector<isolate*> *currentIsolates,std::vector<isolate*> *pop,std::vector<cog*> *accessoryLoci,std::vector<int> &scList,std::vector< std::vector<double> > &sampledVtScFreq,std::vector< std::vector<double> > &sampledNvtScFreq,std::vector<int> &sampledSeroFreq,std::vector<std::string> &serotypeList,std::vector<double> &vtCogFittingStatsList,std::vector<double> &nvtCogFittingStatsList,std::vector<double> &strainFittingStatsList,std::ofstream& sampleOutFile,struct parms *sp);
+
+// compare to disease samples
+int compare_to_disease_data(std::vector<double> diseaseDivergence,
+                            int simulation_time,
+                            std::vector<isolate*> *currentIsolates,
+                            std::vector<int> *diseaseTime,
+                            std::vector<std::string> *diseaseSeroList,
+                            std::vector<int> *diseaseScList,
+                            std::vector<int> *diseaseVt,
+                            std::vector<double> *diseaseInvasiveness,
+                            std::vector<int> *diseasePopulation,
+                            std::vector<int> *diseaseCount);
 
 // just record sample statistics in pure simulation mode
 int justRecordStats(int gen,int minGen,int sampleSize,std::vector<isolate*> *currentIsolates,std::vector<cog*> *accessoryLoci);
@@ -136,3 +158,5 @@ void tidyUpIsolates(std::vector<isolate*> *a_list, std::vector<isolate*> *b_list
 void tidyUpLoci(std::vector<cog*> *cog_list);
 
 #endif /* defined(__frequencyDependentSimulation__functions__) */
+&&
+*
