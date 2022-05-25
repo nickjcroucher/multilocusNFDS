@@ -2128,7 +2128,7 @@ int parse_disease_data(char* epiFilename,
 // Compare to disease samples //
 //////////////////////////////////////////////
 
-int compare_to_disease_data(std::vector<double> diseaseDivergence,
+int compare_to_disease_data(std::vector<double> &diseaseDivergence,
                             int simulation_time,
                             std::vector<isolate*> *currentIsolates,
                             std::vector<int> *diseaseTime,
@@ -2212,6 +2212,9 @@ int compare_to_disease_data(std::vector<double> diseaseDivergence,
         }
         
     }
+    
+    // Record
+    diseaseDivergence.push_back(total_deviation);
     
     return 0;
     

@@ -691,6 +691,9 @@ int main(int argc, char * argv[]) {
             totalVtCogDeviation+=vtCogFittingStatsList[i];
             totalNvtCogDeviation+=nvtCogFittingStatsList[i];
             totalStrainDeviation+=strainFittingStatsList[i];
+            if (epiFilename != NULL) {
+                totalStrainDeviation+=diseaseFittingStatsList[i];
+            }
         }
         
         // now add reproductive fitness deviations

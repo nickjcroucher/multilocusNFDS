@@ -118,7 +118,7 @@ int updatePopulation(std::vector<isolate*> *pop,std::vector<isolate*> *new_pop);
 int compareSamples(int gen,int minGen,int sampleSize,std::vector<isolate*> *currentIsolates,std::vector<isolate*> *pop,std::vector<cog*> *accessoryLoci,std::vector<int> &scList,std::vector< std::vector<double> > &sampledVtScFreq,std::vector< std::vector<double> > &sampledNvtScFreq,std::vector<int> &sampledSeroFreq,std::vector<std::string> &serotypeList,std::vector<double> &vtCogFittingStatsList,std::vector<double> &nvtCogFittingStatsList,std::vector<double> &strainFittingStatsList,std::ofstream& sampleOutFile,struct parms *sp);
 
 // compare to disease samples
-int compare_to_disease_data(std::vector<double> diseaseDivergence,
+int compare_to_disease_data(std::vector<double> &diseaseDivergence,
                             int simulation_time,
                             std::vector<isolate*> *currentIsolates,
                             std::vector<int> *diseaseTime,
@@ -159,4 +159,3 @@ void tidyUpIsolates(std::vector<isolate*> *a_list, std::vector<isolate*> *b_list
 void tidyUpLoci(std::vector<cog*> *cog_list);
 
 #endif /* defined(__frequencyDependentSimulation__functions__) */
-
