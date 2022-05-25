@@ -256,7 +256,7 @@ int main(int argc, char * argv[]) {
         scList.insert(scList.end(),migrant_scList.begin(),migrant_scList.end());
         sort(scList.begin(), scList.end());
         std::vector<int>::iterator it;
-        it = std::unique (scList.begin(), scList.end());
+        it = std::unique(scList.begin(), scList.end());
         scList.resize(std::distance(scList.begin(),it));
     }
     
