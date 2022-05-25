@@ -388,7 +388,7 @@ int main(int argc, char * argv[]) {
     if (p.programme != "s" && p.programme != "x" && epiFilename != NULL) {
         // sample output
         diseaseOutFile.open(diseaseOutFilename,std::ios::out);
-        diseaseOutFile << "Time\tCarriage\tPopulation\tInvasiveness\tSerotype\tVT\tSC\tObserved\tSimulated" << std::endl;
+        diseaseOutFile << "Time\tCarriage\tPopulation\tInvasiveness\tSerotype\tVT\tSC\tObserved\tSimulated\tJSD" << std::endl;
     }
     
     /////////////////////////////
@@ -639,6 +639,11 @@ int main(int argc, char * argv[]) {
                                                         diseasePopulation,
                                                         diseaseCount,
                                                         diseaseOutFile);
+                            if (disease_comparison != 0) {
+                                std::cerr << "Unable to compare simulated and actual disease frequencies" << std::endl;
+                                usage(argv[0]);
+                                return 1;
+                            }
                         }
                     
 //                    } else {

@@ -2055,32 +2055,72 @@ int compare_to_disease_data(std::vector<double> diseaseDivergence,
     // first calculate total population size for frequency calculation
     int population_size = currentIsolates->size();
     
+    // store the simulated carriage and disease counts
+    int total_disease_count = 0;
+    int actual_disease_count = 0;
+    std::vector<int> disease_counts;
+    std::vector<int> carriage_counts;
+    
     // then iterate through strain/serotype combinations
+    // calculate simulated disease frequencies
     double total_deviation = 0.0;
     for (unsigned int i = 0; i < diseaseTime->size(); i++) {
+        int simulated_disease_count = 0;
+        int simulated_carriage_count = 0;
         // only test at the appropriate time point
         if ((*diseaseTime)[i] == simulation_time) {
             // get serotype and strain
             std::string serotype = (*diseaseSeroList)[i];
             int sc = (*diseaseScList)[i];
             // calculate the carriage frequency of each
-            int carriage_count = 0;
             std::vector<isolate*>::iterator iiter;
             for (iiter = currentIsolates->begin(), currentIsolates->end(); iiter != currentIsolates->end(); ++iiter) {
                 if (sc == (*iiter)->sc && serotype == (*iiter)->serotype) {
-                    carriage_count++;
+                    simulated_carriage_count++;
                 }
             }
-            double carriage_frequency = ((1.0)*carriage_count)/((1.0)*population_size);
+            double carriage_frequency = ((1.0)*simulated_carriage_count)/((1.0)*population_size);
             // calculate the Poisson variable
             double poisson_var = carriage_frequency*(*diseasePopulation)[i]*(*diseaseInvasiveness)[i];
             // draw from the distribution
-            int simulated_disease_count = gsl_ran_poisson(rgen,poisson_var);
+            simulated_disease_count = gsl_ran_poisson(rgen,poisson_var);
+            total_disease_count += simulated_disease_count;
+            // record the actual disease total
+            actual_disease_count += (*diseaseCount)[i];
+        }
+        disease_counts.push_back(simulated_disease_count);
+        carriage_counts.push_back(simulated_carriage_count);
+    }
+    
+    // Iterate a second time using the total_disease value
+    for (unsigned int i = 0; i < diseaseTime->size(); i++) {
+        // only test at the appropriate time point
+        if ((*diseaseTime)[i] == simulation_time) {
+            // isolate characteristics
+            std::string serotype = (*diseaseSeroList)[i];
+            int sc = (*diseaseScList)[i];
+            double simulated_carriage_count = carriage_counts[i];
+            double carriage_frequency = ((1.0)*simulated_carriage_count)/((1.0)*population_size);
+            // calculate frequencies
+            double simulated_disease_frequency = 1.0*disease_counts[i]/total_disease_count;
+            double actual_disease_frequency = 1.0*(*diseaseCount)[i]/actual_disease_count;
             // add deviation to the appropriate total
-            int deviation = abs(simulated_disease_count - (*diseaseCount)[i]);
-            total_deviation += deviation;
+            double JSD = 0.0;
+            double M = (simulated_disease_frequency + actual_disease_frequency)/2.0;
+            if (M > 0) {
+                double D_PM = 0.0;
+                if (actual_disease_frequency > 0) {
+                    D_PM = actual_disease_frequency*log(actual_disease_frequency/M);
+                }
+                double D_QM = 0.0;
+                if (simulated_disease_frequency > 0) {
+                    D_QM = simulated_disease_frequency*log(simulated_disease_frequency/M);
+                }
+                JSD = 0.5*(D_PM+D_QM);
+            }
+            total_deviation += JSD;
             // print output
-            diseaseOutFile << simulation_time << "\t" << carriage_frequency << "\t" << (*diseasePopulation)[i] << "\t" << (*diseaseInvasiveness)[i] << "\t" << serotype << "\t" << (*diseaseVt)[i] << "\t" << sc << "\t" << (*diseaseCount)[i] << "\t" << simulated_disease_count << std::endl;
+            diseaseOutFile << simulation_time << "\t" << carriage_frequency << "\t" << (*diseasePopulation)[i] << "\t" << (*diseaseInvasiveness)[i] << "\t" << serotype << "\t" << (*diseaseVt)[i] << "\t" << sc << "\t" << (*diseaseCount)[i] << "\t" << disease_counts[i] << "\t" << JSD << std::endl;
         }
         
     }
