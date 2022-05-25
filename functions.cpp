@@ -1842,77 +1842,165 @@ int compareSamples(int gen,int minGen,int sampleSize,std::vector<isolate*> *curr
         sampledSeroFreq[i] = std::count(currentSerotypeObservations.begin(),currentSerotypeObservations.end(),serotypeList[i]);
     }
 
-    // summarise sequence cluster information from genomic data
-    std::vector<int> currentGenomicVtScObservations;
-    std::vector<int> currentGenomicNvtScObservations;
+    ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+    std::vector< std::vector<std::string> > serotypes_in_sc(scList.size());
     
-    std::vector<isolate*>::iterator iiter;
-    for (iiter = pop->begin(), pop->end() ; iiter != pop->end(); ++iiter) {
-        if ((*iiter)->year == gen && (*iiter)->vt) {
-            currentGenomicVtScObservations.push_back((*iiter)->sc);
-        } else if ((*iiter)->year == gen && !((*iiter)->vt)) {
-            currentGenomicNvtScObservations.push_back((*iiter)->sc);
+    // First identify all serotypes in all SC - in the actual and simulated populations
+    int total_sample_size = 0;
+    int simulated_sample_size = 0;
+    for (int i = 0; i < scList.size(); ++i) {
+        std::vector<isolate*>::iterator iiter;
+        // Iterate through actual population
+        for (iiter = pop->begin(), pop->end() ; iiter != pop->end(); ++iiter) {
+            if ((*iiter)->year == gen) {
+                if ((*iiter)->sc == scList[i]) {
+                    bool unseen_serotype = true;
+                    for (int j = 0; j < serotypes_in_sc[i].size(); ++j) {
+                        if ((*iiter)->serotype == serotypes_in_sc[i][j]) {
+                            unseen_serotype = false;
+                        }
+                    }
+                    if (unseen_serotype) {
+                        serotypes_in_sc[i].push_back((*iiter)->serotype);
+                    }
+                    total_sample_size++;
+                }
+            }
+        }
+        // Iterate through simulated population
+        for (iiter = isolateSample.begin(), isolateSample.end() ; iiter != isolateSample.end(); ++iiter) {
+            if ((*iiter)->sc == scList[i]) {
+                bool unseen_serotype = true;
+                for (int j = 0; j < serotypes_in_sc[i].size(); ++j) {
+                    if ((*iiter)->serotype == serotypes_in_sc[i][j]) {
+                        unseen_serotype = false;
+                    }
+                }
+                if (unseen_serotype) {
+                    serotypes_in_sc[i].push_back((*iiter)->serotype);
+                }
+                simulated_sample_size++;
+            }
         }
     }
     
-    // summarise sequence cluster observations into counts
-    std::vector<int> currentVtScCounts(scList.size(),0);
-    std::vector<int> currentNvtScCounts(scList.size(),0);
-    std::vector<int> currentGenomicVtScCount(scList.size(),0);
-    std::vector<int> currentGenomicNvtScCount(scList.size(),0);
-    
-    for (unsigned int i = 0; i < scList.size(); ++i) {
-        // observations from simulated data
-        currentVtScCounts[i] = std::count(currentVtScObservations.begin(),currentVtScObservations.end(),scList[i]);
-        currentNvtScCounts[i] = std::count(currentNvtScObservations.begin(),currentNvtScObservations.end(),scList[i]);
-        // general storage of frequencies for printing
-        sampledVtScFreq[gen-minGen][i] = double(currentVtScCounts[i])/double(sampleSize);
-        sampledNvtScFreq[gen-minGen][i] = double(currentNvtScCounts[i])/double(sampleSize);
-        // observations from genomic data
-        currentGenomicVtScCount[i] = std::count(currentGenomicVtScObservations.begin(),currentGenomicVtScObservations.end(),scList[i]);
-        currentGenomicNvtScCount[i] = std::count(currentGenomicNvtScObservations.begin(),currentGenomicNvtScObservations.end(),scList[i]);
+    // Check samples sizes match
+    if (simulated_sample_size != total_sample_size) {
+        std::cerr << "Observed sample size (" << total_sample_size << ") does not match that of simulation (" << simulated_sample_size << ")" << std::endl;
+        exit(1);
     }
     
-    // calculate divergence between real and simulated samples
-    double cumulativeScDifference = 0.0;
-//    double cumulativeJSD = 0.0;
-    for (unsigned int i = 0; i < scList.size(); i++) {
-//        double dkl_vt = std::abs(((double(currentGenomicVtScCount[i])+0.5)/double(sampleSize))*log((double(currentGenomicVtScCount[i])+0.5)/(double(currentVtScCounts[i])+0.5)));
-//        double dkl_nvt = std::abs(((double(currentGenomicNvtScCount[i])+0.5)/double(sampleSize))*log((double(currentGenomicNvtScCount[i])+0.5)/(double(currentNvtScCounts[i])+0.5)));
-        
-        // calculate Jensen-Shannon divergence
-        double jsd_vt = 0;
-        double jsd_nvt = 0;
-        
-        double currentVtSimFreq = double(currentVtScCounts[i])/double(sampleSize);
-        double currentNvtSimFreq = double(currentNvtScCounts[i])/double(sampleSize);
-        double currentVtGenomicFreq = double(currentGenomicVtScCount[i])/double(sampleSize);
-        double currentNvtGenomicFreq = double(currentGenomicNvtScCount[i])/double(sampleSize);
-        double m_vt = (0.5/double(sampleSize))*(double(currentGenomicVtScCount[i])+double(currentVtScCounts[i]));
-        double m_nvt = (0.5/double(sampleSize))*(double(currentNvtScCounts[i])+double(currentGenomicNvtScCount[i]));
-        if (m_vt > 0.0) {
-            if (currentVtSimFreq > 0) {
-                jsd_vt += 0.5*currentVtSimFreq*log(currentVtSimFreq/m_vt);
+    // Record frequencies and calculate deviations
+    double jsd = 0.0;
+    for (int i = 0; i < scList.size(); ++i) {
+        for (int j = 0; j < serotypes_in_sc[i].size(); ++j) {
+            int actual_count = 0;
+            int simulated_count = 0;
+            std::vector<isolate*>::iterator iiter;
+            // Iterate through actual population
+            for (iiter = pop->begin(), pop->end() ; iiter != pop->end(); ++iiter) {
+                if ((*iiter)->year == gen && (*iiter)->sc == scList[i] && (*iiter)->serotype == serotypes_in_sc[i][j]) {
+                    actual_count++;
+                }
             }
-            if (currentVtGenomicFreq > 0) {
-                jsd_vt += 0.5*currentVtGenomicFreq*log(currentVtGenomicFreq/m_vt);
+            // Iterate through simulated population
+            for (iiter = isolateSample.begin(), isolateSample.end() ; iiter != isolateSample.end(); ++iiter) {
+                if ((*iiter)->sc == scList[i] && (*iiter)->serotype == serotypes_in_sc[i][j]) {
+                    simulated_count++;
+                }
             }
+            // Calculate frequencies
+            double actual_frequency = actual_count/(1.0*total_sample_size);
+            double simulated_frequency = simulated_count/(1.0*simulated_sample_size);
+            double M = 0.5*(actual_frequency+simulated_frequency);
+            // Calculate JSD
+            double individual_jsd = 0.0;
+            if (actual_frequency > 0.0) {
+                individual_jsd += 0.5*actual_frequency*log(actual_frequency/M);
+            }
+            if (simulated_frequency > 0.0) {
+                individual_jsd += 0.5*simulated_frequency*log(simulated_frequency/M);
+            }
+            jsd += individual_jsd;
         }
-        if (m_nvt > 0.0) {
-            if (currentNvtSimFreq > 0) {
-                jsd_nvt += 0.5*currentNvtSimFreq*log(currentNvtSimFreq/m_nvt);
-            }
-            if (currentNvtGenomicFreq > 0) {
-                jsd_nvt += 0.5*currentNvtGenomicFreq*log(currentNvtGenomicFreq/m_nvt);
-            }
-        }
-        
-        cumulativeScDifference+=(jsd_vt+jsd_nvt);
-//        std::cerr << scList[i] << "\t" << dkl_vt << "\t" << dkl_nvt << "\t" << jsd_vt << "\t" << jsd_nvt << std::endl;
-//        std::cerr << scList[i] << "\t" << dkl_vt << "\t" << dkl_nvt << "\t" << jsd_vt << "\t" << jsd_nvt << "\t" << currentVtSimFreq << "\t" << currentNvtSimFreq << "\t" << currentVtGenomicFreq << "\t" << currentNvtGenomicFreq << std::endl;
-//        std::cerr << "sc " << scList[i] << " vt KLD " << dkl_vt << " nvt KLD " << dkl_nvt << " total KLD " << cumulativeScDifference << std::endl;
-//        std::cerr << "\tsc " << scList[i] << " vt JSD " << jsd_vt << " nvt JSD " << jsd_nvt << " total JSD " << cumulativeJSD << std::endl;
     }
+    
+    ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    
+//    // summarise sequence cluster information from genomic data
+//    std::vector<int> currentGenomicVtScObservations;
+//    std::vector<int> currentGenomicNvtScObservations;
+//    
+//    std::vector<isolate*>::iterator iiter;
+//    for (iiter = pop->begin(), pop->end() ; iiter != pop->end(); ++iiter) {
+//        if ((*iiter)->year == gen && (*iiter)->vt) {
+//            currentGenomicVtScObservations.push_back((*iiter)->sc);
+//        } else if ((*iiter)->year == gen && !((*iiter)->vt)) {
+//            currentGenomicNvtScObservations.push_back((*iiter)->sc);
+//        }
+//    }
+//    
+//    // summarise sequence cluster observations into counts
+//    std::vector<int> currentVtScCounts(scList.size(),0);
+//    std::vector<int> currentNvtScCounts(scList.size(),0);
+//    std::vector<int> currentGenomicVtScCount(scList.size(),0);
+//    std::vector<int> currentGenomicNvtScCount(scList.size(),0);
+//    
+//    for (unsigned int i = 0; i < scList.size(); ++i) {
+//        // observations from simulated data
+//        currentVtScCounts[i] = std::count(currentVtScObservations.begin(),currentVtScObservations.end(),scList[i]);
+//        currentNvtScCounts[i] = std::count(currentNvtScObservations.begin(),currentNvtScObservations.end(),scList[i]);
+//        // general storage of frequencies for printing
+//        sampledVtScFreq[gen-minGen][i] = double(currentVtScCounts[i])/double(sampleSize);
+//        sampledNvtScFreq[gen-minGen][i] = double(currentNvtScCounts[i])/double(sampleSize);
+//        // observations from genomic data
+//        currentGenomicVtScCount[i] = std::count(currentGenomicVtScObservations.begin(),currentGenomicVtScObservations.end(),scList[i]);
+//        currentGenomicNvtScCount[i] = std::count(currentGenomicNvtScObservations.begin(),currentGenomicNvtScObservations.end(),scList[i]);
+//    }
+//    
+//    // calculate divergence between real and simulated samples
+//    double cumulativeScDifference = 0.0;
+////    double cumulativeJSD = 0.0;
+//    for (unsigned int i = 0; i < scList.size(); i++) {
+////        double dkl_vt = std::abs(((double(currentGenomicVtScCount[i])+0.5)/double(sampleSize))*log((double(currentGenomicVtScCount[i])+0.5)/(double(currentVtScCounts[i])+0.5)));
+////        double dkl_nvt = std::abs(((double(currentGenomicNvtScCount[i])+0.5)/double(sampleSize))*log((double(currentGenomicNvtScCount[i])+0.5)/(double(currentNvtScCounts[i])+0.5)));
+//        
+//        // calculate Jensen-Shannon divergence
+//        double jsd_vt = 0;
+//        double jsd_nvt = 0;
+//        
+//        double currentVtSimFreq = double(currentVtScCounts[i])/double(sampleSize);
+//        double currentNvtSimFreq = double(currentNvtScCounts[i])/double(sampleSize);
+//        double currentVtGenomicFreq = double(currentGenomicVtScCount[i])/double(sampleSize);
+//        double currentNvtGenomicFreq = double(currentGenomicNvtScCount[i])/double(sampleSize);
+//        double m_vt = (0.5/double(sampleSize))*(double(currentGenomicVtScCount[i])+double(currentVtScCounts[i]));
+//        double m_nvt = (0.5/double(sampleSize))*(double(currentNvtScCounts[i])+double(currentGenomicNvtScCount[i]));
+//        if (m_vt > 0.0) {
+//            if (currentVtSimFreq > 0) {
+//                jsd_vt += 0.5*currentVtSimFreq*log(currentVtSimFreq/m_vt);
+//            }
+//            if (currentVtGenomicFreq > 0) {
+//                jsd_vt += 0.5*currentVtGenomicFreq*log(currentVtGenomicFreq/m_vt);
+//            }
+//        }
+//        if (m_nvt > 0.0) {
+//            if (currentNvtSimFreq > 0) {
+//                jsd_nvt += 0.5*currentNvtSimFreq*log(currentNvtSimFreq/m_nvt);
+//            }
+//            if (currentNvtGenomicFreq > 0) {
+//                jsd_nvt += 0.5*currentNvtGenomicFreq*log(currentNvtGenomicFreq/m_nvt);
+//            }
+//        }
+//        
+//        cumulativeScDifference+=(jsd_vt+jsd_nvt);
+////        std::cerr << scList[i] << "\t" << dkl_vt << "\t" << dkl_nvt << "\t" << jsd_vt << "\t" << jsd_nvt << std::endl;
+////        std::cerr << scList[i] << "\t" << dkl_vt << "\t" << dkl_nvt << "\t" << jsd_vt << "\t" << jsd_nvt << "\t" << currentVtSimFreq << "\t" << currentNvtSimFreq << "\t" << currentVtGenomicFreq << "\t" << currentNvtGenomicFreq << std::endl;
+////        std::cerr << "sc " << scList[i] << " vt KLD " << dkl_vt << " nvt KLD " << dkl_nvt << " total KLD " << cumulativeScDifference << std::endl;
+////        std::cerr << "\tsc " << scList[i] << " vt JSD " << jsd_vt << " nvt JSD " << jsd_nvt << " total JSD " << cumulativeJSD << std::endl;
+//    }
+    
+    ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     
     // record COG frequencies from both simulation sample and genomic sample
     std::vector<double> currentSampleVtFreq;
@@ -1964,7 +2052,7 @@ int compareSamples(int gen,int minGen,int sampleSize,std::vector<isolate*> *curr
     // record final statistics
     vtCogFittingStatsList.push_back(vtCogStat);
     nvtCogFittingStatsList.push_back(nvtCogStat);
-    strainFittingStatsList.push_back(cumulativeScDifference);
+    strainFittingStatsList.push_back(jsd);
     
     return 0;
 }
