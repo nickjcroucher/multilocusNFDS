@@ -523,6 +523,9 @@ int main(int argc, char * argv[]) {
     
     for (gen = minGen+1; gen <= genLimit; gen++) {
         
+        // extract cogDeviations according to NFDS lag interval
+        cogDeviations = cogDeviations_store[p.nfdsLag-1];
+        
         // prevent further reproduction if population too large
         if (continue_reproducing) {
         
@@ -680,6 +683,13 @@ int main(int argc, char * argv[]) {
                 }
             }
         }
+        
+        // cogDeviations are updated
+        for (int i = (p.nfdsLag-1); i >= 1; i--) {
+            cogDeviations_store[i] = cogDeviations_store[i-1];
+        }
+        cogDeviations_store[0] = cogDeviations;
+        
     }
     
     ///////////////////////////////
