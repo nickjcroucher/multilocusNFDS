@@ -509,6 +509,14 @@ bool checkInputValues(struct parms *sp,char * inputFilename,char * vtCogName, ch
         std::cerr << "Need a COG name: currently not defined" << std::endl;
         tmpvalid = 0;
     }
+    if (sp->vaccineLag < 0) {
+        std::cerr << "Vaccine lag (in months) must be equal to or greater than zero" << std::endl;
+        tmpvalid = 0;
+    }
+    if (sp->nfdsLag < 1) {
+        std::cerr << "NFDS lag (in months) must be equal to or greater than one" << std::endl;
+        tmpvalid = 0;
+    }
     // check recombination parameters
     if (sp->transformationProportion*sp->transformationRate == 0 && sp->transformationProportion+sp->transformationRate > 0) {
         std::cerr << "Warning! Need to set transformation proportion (z) and transformation rate (e) both greater than zero for recombination to occur" << std::endl;

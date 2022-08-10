@@ -50,7 +50,7 @@ int main(int argc, char * argv[]) {
     p.het_mode = "s";
     p.densdepMode = 0;
     p.vaccineLag = 0;
-    p.nfdsLag = 0;
+    p.nfdsLag = 1;
     
     ////////////////////////
     // Parse command line //
