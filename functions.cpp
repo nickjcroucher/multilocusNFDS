@@ -1303,12 +1303,27 @@ std::vector<int> getValidStrains(std::vector<std::vector<isolate*> > migrantInpu
     
 }
 
-int reproduction(std::vector<isolate*> *currentIsolates,std::vector<isolate*> *futureIsolates,std::vector<std::vector<std::vector<isolate*> > > *migrantPool, std::vector<double> *cogWeights, std::vector<double> *cogDeviations,struct parms *sp, std::vector<double> * ef, std::vector<int> * vtScFreq,std::vector<int> * nvtScFreq,std::vector<double> * piGen,std::vector<int> *scList, int gen,std::vector<double> * timeGen,std::vector<double> * fitGen,std::vector<std::string> * isolateGen,std::vector<int> * countGen, double popLimitFactor, int minGen) {
+int reproduction(std::vector<isolate*> *currentIsolates,std::vector<isolate*> *futureIsolates,std::vector<std::vector<std::vector<isolate*> > > *migrantPool, std::vector<double> *cogWeights, std::vector<double> *cogDeviations,struct parms *sp, std::vector<double> * ef, std::vector<int> * vtScFreq,std::vector<int> * nvtScFreq,std::vector<double> * piGen,std::vector<int> *scList, int gen,std::vector<double> * timeGen,std::vector<double> * fitGen,std::vector<std::string> * isolateGen,std::vector<int> * countGen, double popLimitFactor, int minGen, int secondVaccinationGeneration) {
     
     // calculate population limit for memory management
     int popLimit = round(popLimitFactor * double(sp->popSize));
     if (popLimit < 0) {
         popLimit = std::numeric_limits<int>::max();
+    }
+    
+    // calculate vaccine strength
+    int lastVaccineIntroduction = 0;
+    double vaccineSelection = double(sp->vSelection);
+    if (sp->vaccineLag >= 0 && gen >= 0) {
+        // date of last vaccine introduction
+        if (gen >= secondVaccinationGeneration) {
+            lastVaccineIntroduction = secondVaccinationGeneration;
+        }
+        // is simulation in lag period?
+        int timeSinceVaccination = gen - lastVaccineIntroduction;
+        if (timeSinceVaccination < sp->vaccineLag) {
+            vaccineSelection = double(timeSinceVaccination)/double(sp->vaccineLag)*double(sp->vSelection);
+        }
     }
     
     // new COG deviations array
@@ -1359,7 +1374,18 @@ int reproduction(std::vector<isolate*> *currentIsolates,std::vector<isolate*> *f
             
             // only switch on vaccine selection pressure after vaccine is introduced
             if (gen >= 0 && (*iter)->vt) {
-                vaccineFit = 1.0 - double(sp->vSelection);
+                // if vaccine lag, then only apply to latent_vt for the second vaccine
+                if (sp->vaccineLag > 0 && lastVaccineIntroduction > 0) {
+                    if ((*iter)->latent_vt) {
+                        // reduced selection on serotypes unique to second vaccine
+                        vaccineFit = 1.0 - vaccineSelection;
+                    } else {
+                        // full selection on serotypes in first vaccine
+                        vaccineFit = 1.0 - sp->vSelection;
+                    }
+                } else {
+                    vaccineFit = 1.0 - vaccineSelection;
+                }
             }
             
             // calculate overall fitness
