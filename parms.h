@@ -38,6 +38,8 @@ struct parms {
     double decayRate;
     std::string het_mode;
     int densdepMode;
+    int vaccineLag;
+    int nfdsLag;
 };
 
 // structure for isolate objects

@@ -49,6 +49,8 @@ int main(int argc, char * argv[]) {
     p.decayRate = 0.01;
     p.het_mode = "s";
     p.densdepMode = 0;
+    p.vaccineLag = 0;
+    p.nfdsLag = 0;
     
     ////////////////////////
     // Parse command line //
@@ -191,6 +193,12 @@ int main(int argc, char * argv[]) {
                     break;
                 case 'I':
                     epiFilename = optarg;
+                    break;
+                case 'V':
+                    p.vaccineLag = atoi(optarg);
+                    break;
+                case 'N':
+                    p.nfdsLag = atoi(optarg);
                     break;
             }
         }
