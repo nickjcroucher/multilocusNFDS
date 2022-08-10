@@ -429,6 +429,7 @@ int main(int argc, char * argv[]) {
     std::vector< std::vector<double> > sampledNvtScFreq(samplingList->size()+1,std::vector<double>(scList.size(),0.0));
     // data structures for COG frequency measurements
     std::vector<double> cogDeviations(eqFreq.size());
+    std::vector<std::vector<double> > cogDeviations_store(p.nfdsLag,std::vector<double>(eqFreq.size()));
     
     // initialise population in first generation, record simulated population statistics
     int gen = minGen;
@@ -452,6 +453,11 @@ int main(int argc, char * argv[]) {
         std::cerr << "Unable to initialise population" << std::endl;
         usage(argv[0]);
         return 1;
+    }
+    
+    // fill in cog deviations stored values
+    for (int i = 0; i < p.nfdsLag; i++) {
+        cogDeviations_store[i] = cogDeviations;
     }
     
     // check if second vaccine formulation is implemented from the start
