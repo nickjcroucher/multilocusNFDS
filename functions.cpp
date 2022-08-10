@@ -1320,17 +1320,20 @@ int reproduction(std::vector<isolate*> *currentIsolates,std::vector<isolate*> *f
     }
     
     // calculate vaccine strength
-    int lastVaccineIntroduction = 0;
-    double vaccineSelection = double(sp->vSelection);
+    double firstVaccineSelection = double(sp->vSelection);
+    double secondVaccineSelection = double(sp->vSelection);
     if (sp->vaccineLag >= 0 && gen >= 0) {
+        // time since first vaccine introduction
+        if (gen <= sp->vaccineLag) {
+            firstVaccineSelection = double(gen)/double(sp->vaccineLag)*double(sp->vSelection);
+        }
         // date of last vaccine introduction
         if (gen >= secondVaccinationGeneration) {
-            lastVaccineIntroduction = secondVaccinationGeneration;
-        }
-        // is simulation in lag period?
-        int timeSinceVaccination = gen - lastVaccineIntroduction;
-        if (timeSinceVaccination < sp->vaccineLag) {
-            vaccineSelection = double(timeSinceVaccination)/double(sp->vaccineLag)*double(sp->vSelection);
+            // is simulation in lag period?
+            int timeSinceVaccination = gen - secondVaccinationGeneration;
+            if (timeSinceVaccination < sp->vaccineLag) {
+                secondVaccineSelection = double(timeSinceVaccination)/double(sp->vaccineLag)*double(sp->vSelection);
+            }
         }
     }
     
@@ -1383,16 +1386,23 @@ int reproduction(std::vector<isolate*> *currentIsolates,std::vector<isolate*> *f
             // only switch on vaccine selection pressure after vaccine is introduced
             if (gen >= 0 && (*iter)->vt) {
                 // if vaccine lag, then only apply to latent_vt for the second vaccine
-                if (sp->vaccineLag > 0 && lastVaccineIntroduction > 0) {
-                    if ((*iter)->latent_vt) {
-                        // reduced selection on serotypes unique to second vaccine
-                        vaccineFit = 1.0 - vaccineSelection;
+                if (sp->vaccineLag > 0) {
+                    if (gen >= secondVaccinationGeneration) {
+                        if ((*iter)->latent_vt) {
+                            // reduced selection on serotypes unique to second vaccine
+                            vaccineFit = 1.0 - secondVaccineSelection;
+                        } else {
+                            // full selection on serotypes in first vaccine
+                            // adjusted for time since introduction of first vaccine
+                            vaccineFit = 1.0 - firstVaccineSelection;
+                        }
                     } else {
                         // full selection on serotypes in first vaccine
-                        vaccineFit = 1.0 - sp->vSelection;
+                        // adjusted for time since introduction of first vaccine
+                        vaccineFit = 1.0 - firstVaccineSelection;
                     }
                 } else {
-                    vaccineFit = 1.0 - vaccineSelection;
+                    vaccineFit = 1.0 - sp->vSelection;
                 }
             }
             
