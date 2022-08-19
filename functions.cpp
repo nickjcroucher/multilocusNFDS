@@ -96,6 +96,7 @@ int parseInputFile(std::vector<isolate*> *pop, std::vector<cog*> *accessoryLoci,
             std::string sample_serotype = "noSero";
             bool sample_vt = 0;
             bool sample_latent_vt = 0;
+            bool partial_vt = 0;
             std::vector<bool> sample_genotype;
             std::string iname;
             std::istringstream iss(line);
@@ -118,12 +119,23 @@ int parseInputFile(std::vector<isolate*> *pop, std::vector<cog*> *accessoryLoci,
                         if (vt_int == 0) {
                             sample_vt = false;
                             sample_latent_vt = false;
+                            partial_vt = false;
                         } else  if (vt_int == 1) {
                             sample_vt = true;
                             sample_latent_vt = false;
+                            partial_vt = false;
                         } else if (vt_int == 2) {
                             sample_vt = false;
                             sample_latent_vt = true;
+                            partial_vt = false;
+                        } else  if (vt_int == 3) {
+                            sample_vt = true;
+                            sample_latent_vt = false;
+                            partial_vt = true;
+                        } else if (vt_int == 4) {
+                            sample_vt = false;
+                            sample_latent_vt = true;
+                            partial_vt = true;
                         } else {
                             std::cerr << "Unknown VT status for " << sample_id << std::endl;
                         }
@@ -146,7 +158,16 @@ int parseInputFile(std::vector<isolate*> *pop, std::vector<cog*> *accessoryLoci,
             }
             if (iname != "Taxon" && sample_time != -1 && sample_sc != -1 && sample_serotype.compare("noSero") != 0) {
                 std::vector<bool> sample_markers(0);
-                isolate* tmp = new isolate(sample_id,sample_time,sample_sc,sample_serotype,sample_vt,sample_latent_vt,&sample_genotype,&sample_markers,1.0);
+                isolate* tmp = new isolate(sample_id,
+                                           sample_time,
+                                           sample_sc,
+                                           sample_serotype,
+                                           sample_vt,
+                                           sample_latent_vt,
+                                           partial_vt,
+                                           &sample_genotype,
+                                           &sample_markers,
+                                           1.0);
                 pop->push_back(tmp);
                 // record isolate information
                 samplingTimes.push_back(sample_time);
@@ -1311,7 +1332,7 @@ std::vector<int> getValidStrains(std::vector<std::vector<isolate*> > migrantInpu
     
 }
 
-int reproduction(std::vector<isolate*> *currentIsolates,std::vector<isolate*> *futureIsolates,std::vector<std::vector<std::vector<isolate*> > > *migrantPool, std::vector<double> *cogWeights, std::vector<double> *cogDeviations,struct parms *sp, std::vector<double> * ef, std::vector<int> * vtScFreq,std::vector<int> * nvtScFreq,std::vector<double> * piGen,std::vector<int> *scList, int gen,std::vector<double> * timeGen,std::vector<double> * fitGen,std::vector<std::string> * isolateGen,std::vector<int> * countGen, double popLimitFactor, int minGen, int secondVaccinationGeneration) {
+int reproduction(std::vector<isolate*> *currentIsolates,std::vector<isolate*> *futureIsolates,std::vector<std::vector<std::vector<isolate*> > > *migrantPool, std::vector<double> *cogWeights, std::vector<double> *cogDeviations,struct parms *sp, std::vector<double> * ef, std::vector<int> * vtScFreq,std::vector<int> * nvtScFreq,std::vector<double> * piGen,std::vector<int> *scList, int gen,std::vector<double> * timeGen,std::vector<double> * fitGen,std::vector<std::string> * isolateGen,std::vector<int> * countGen, double popLimitFactor, int minGen, int secondVaccinationGeneration, float partialVaccine) {
     
     // calculate population limit for memory management
     int popLimit = round(popLimitFactor * double(sp->popSize));
@@ -1388,21 +1409,44 @@ int reproduction(std::vector<isolate*> *currentIsolates,std::vector<isolate*> *f
                 // if vaccine lag, then only apply to latent_vt for the second vaccine
                 if (sp->vaccineLag > 0) {
                     if (gen >= secondVaccinationGeneration) {
-                        if ((*iter)->latent_vt) {
+                        // Here it is assumed anything cross-reactive in first vaccine
+                        // is included in the second vaccine - needs to be fixed
+                        if ((*iter)->latent_vt || (*iter)->partial_vt) {
                             // reduced selection on serotypes unique to second vaccine
-                            vaccineFit = 1.0 - secondVaccineSelection;
+                            if ((*iter)->latent_vt) {
+                                if ((*iter)->partial_vt) {
+                                    vaccineFit = 1.0 - (secondVaccineSelection*partialVaccine);
+                                } else {
+                                    vaccineFit = 1.0 - secondVaccineSelection;
+                                }
+                            } else {
+                                vaccineFit = 1.0 - secondVaccineSelection;
+                            }
                         } else {
                             // full selection on serotypes in first vaccine
                             // adjusted for time since introduction of first vaccine
-                            vaccineFit = 1.0 - firstVaccineSelection;
+                            if ((*iter)->partial_vt) {
+                                vaccineFit = 1.0 - firstVaccineSelection*partialVaccine;
+                            } else {
+                                vaccineFit = 1.0 - firstVaccineSelection;
+                            }
                         }
                     } else {
                         // full selection on serotypes in first vaccine
                         // adjusted for time since introduction of first vaccine
-                        vaccineFit = 1.0 - firstVaccineSelection;
+                        if ((*iter)->partial_vt) {
+                            vaccineFit = 1.0 - firstVaccineSelection*partialVaccine;
+                        } else {
+                            std::cerr << (*iter)->partial_vt << std::endl;
+                            vaccineFit = 1.0 - firstVaccineSelection;
+                        }
                     }
                 } else {
-                    vaccineFit = 1.0 - sp->vSelection;
+                    if ((*iter)->partial_vt) {
+                        vaccineFit = 1.0 - sp->vSelection*partialVaccine;
+                    } else {
+                        vaccineFit = 1.0 - sp->vSelection;
+                    }
                 }
             }
             
@@ -1703,7 +1747,17 @@ int recombination(std::vector<isolate*> *currentIsolates,std::vector<isolate*> *
                 
                 // store in new population
                 
-                isolate* tmp = new isolate(new_id,recipient.year,recipient.sc,recipient.serotype,recipient.vt,recipient.latent_vt,&recipient.genotype,&recipient.markers,recipient.fitness);
+                isolate* tmp = new isolate(new_id,
+                                           recipient.year,
+                                           recipient.sc,
+                                           recipient.serotype,
+                                           recipient.vt,
+                                           recipient.latent_vt,
+                                           recipient.partial_vt,
+                                           &recipient.genotype,
+                                           &recipient.markers,
+                                           recipient.fitness
+                                           );
                 futureIsolates->push_back(tmp);
                 
             } else {

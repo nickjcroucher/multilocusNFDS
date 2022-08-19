@@ -50,6 +50,7 @@ struct isolate {
     std::string serotype;
     bool vt;
     bool latent_vt;
+    bool partial_vt;
     std::vector<bool> genotype;
     std::vector<bool> markers;
     double fitness;
@@ -58,13 +59,14 @@ struct isolate {
 //    isolate(std::string init_id, int init_year, int init_sc, std::string init_serotype, bool init_vt, bool second_vt, std::vector<bool> *init_genotype, std::vector<bool> *init_markers) : id(init_id),year(init_year),sc(init_sc),serotype(init_serotype),vt(init_vt),latent_vt(second_vt),genotype(*init_genotype),markers(*init_markers) {}
     
     // constructor for struct 'isolate'
-    isolate(std::string init_id, int init_year, int init_sc, std::string init_serotype, bool init_vt, bool second_vt, std::vector<bool> *init_genotype, std::vector<bool> *init_markers, double init_fitness) {
+    isolate(std::string init_id, int init_year, int init_sc, std::string init_serotype, bool init_vt, bool second_vt, bool partial_vt, std::vector<bool> *init_genotype, std::vector<bool> *init_markers, double init_fitness) {
         id = init_id;
         year = init_year;
         sc = init_sc;
         serotype = init_serotype;
         vt = init_vt;
         latent_vt = second_vt;
+        partial_vt = partial_vt;
         genotype = (*init_genotype);
         markers = (*init_markers);
         fitness = init_fitness;

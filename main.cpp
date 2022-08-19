@@ -72,13 +72,14 @@ int main(int argc, char * argv[]) {
     bool zeroTimeSelection = 0;
     float seedStartingPopulation = 0.0;
     char* epiFilename = NULL;
+    float partialVaccine = 0.0;
     
     if (argc == 1) {
         usage(argv[0]);
         return 1;
     } else {
         int opt = 0;
-        while ((opt = getopt(argc,argv,"Ehc:p:s:v:i:t:n:g:u:l:y:j:k:f:x:w:r:o:m:z:e:a:b:d:q:F:1:2:0:H:D:M:S:I:V:N:")) != EOF) {
+        while ((opt = getopt(argc,argv,"Ehc:p:s:v:i:t:n:g:u:l:y:j:k:f:x:w:r:o:m:z:e:a:b:d:q:F:1:2:0:H:D:M:S:I:V:N:P:")) != EOF) {
             switch (opt) {
                 case 'h':
                     usage(argv[0]);
@@ -199,6 +200,9 @@ int main(int argc, char * argv[]) {
                     break;
                 case 'N':
                     p.nfdsLag = atoi(optarg);
+                    break;
+                case 'P':
+                    partialVaccine = atof(optarg);
                     break;
             }
         }
@@ -608,7 +612,7 @@ int main(int argc, char * argv[]) {
             }
             
             // allow cells to reproduce and update COG deviations array
-            int reproCheck = reproduction(currentIsolates,futureIsolates,migrantPool,&cogWeights,&cogDeviations,&p,&eqFreq,&vtScFreq[gen-minGen],&nvtScFreq[gen-minGen],&piGen[gen-minGen],&scList,gen,&timeGen,&fitGen,&isolateGen,&countGen,popLimitFactor,minGen,secondVaccinationGeneration);
+            int reproCheck = reproduction(currentIsolates,futureIsolates,migrantPool,&cogWeights,&cogDeviations,&p,&eqFreq,&vtScFreq[gen-minGen],&nvtScFreq[gen-minGen],&piGen[gen-minGen],&scList,gen,&timeGen,&fitGen,&isolateGen,&countGen,popLimitFactor,minGen,secondVaccinationGeneration,partialVaccine);
             if (reproCheck == 8888) {
                 std::cerr << "Population exceeded limit at generation " << gen << std::endl;
                 // continue iterations to ensure fitting statistics still incremented
