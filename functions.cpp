@@ -1437,7 +1437,6 @@ int reproduction(std::vector<isolate*> *currentIsolates,std::vector<isolate*> *f
                         if ((*iter)->partial_vt) {
                             vaccineFit = 1.0 - firstVaccineSelection*partialVaccine;
                         } else {
-                            std::cerr << (*iter)->partial_vt << std::endl;
                             vaccineFit = 1.0 - firstVaccineSelection;
                         }
                     }
