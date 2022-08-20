@@ -17,6 +17,7 @@
 #include <string>
 #include <algorithm>
 #include <numeric>
+#include <random>
 #include <gsl/gsl_rng.h>
 #include <gsl/gsl_randist.h>
 #include <gsl/gsl_vector.h>
@@ -1208,14 +1209,21 @@ int getStartingIsolates(std::vector<isolate*> *pop,struct parms *sp,std::vector<
 
 int firstSample(std::vector<isolate*> *currentIsolates,int firstSample,std::ofstream& sampleOutFile,int minGen) {
     
+    // generate list of consecutive integers and shuffle
+    std::vector<int> v(currentIsolates->size()) ;
+    std::iota(std::begin(v), std::end(v), 0);
+    std::random_device rd;
+    std::mt19937 g(rd());
+    std::shuffle(v.begin(), v.end(), g);
+    
     // data structures for sample
     std::vector<isolate*> *isolateSample = new std::vector<isolate*>;
     
     // get appropriately sized random sample from simulation
-    while (isolateSample->size() < unsigned(firstSample)) {
-//        int selection = rand()%currentIsolates->size();
-        int selection = int(double(gsl_rng_uniform(rgen))*currentIsolates->size());
-        isolate *selectedIsolate = (*currentIsolates)[selection];
+    for (int i = 0; i < firstSample; ++i) {
+//    while (isolateSample->size() < unsigned(firstSample)) {
+//        int selection = int(double(gsl_rng_uniform(rgen))*currentIsolates->size());
+        isolate *selectedIsolate = (*currentIsolates)[v[i]];
         isolateSample->push_back(selectedIsolate);
         // print record of sample to file
         int vtInt = 0;
@@ -1914,11 +1922,19 @@ int compareSamples(int gen,int minGen,int sampleSize,std::vector<isolate*> *curr
     std::vector<int> currentVtScObservations;
     std::vector<int> currentNvtScObservations;
     
+    // generate list of consecutive integers and shuffle
+    std::vector<int> v(currentIsolates->size()) ;
+    std::iota(std::begin(v), std::end(v), 0);
+    std::random_device rd;
+    std::mt19937 g(rd());
+    std::shuffle(v.begin(), v.end(), g);
+    
     // get appropriately sized random sample from simulation
-    while (isolateSample.size() < unsigned(sampleSize)) {
-//        int selection = rand()%currentIsolates->size();
-        int selection = int(double(gsl_rng_uniform(rgen))*currentIsolates->size());
-        isolate *selectedIsolate = (*currentIsolates)[selection];
+    for (int i = 0; i < sampleSize; ++i) {
+//    while (isolateSample->size() < unsigned(firstSample)) {
+//        int selection = int(double(gsl_rng_uniform(rgen))*currentIsolates->size());
+        isolate *selectedIsolate = (*currentIsolates)[v[i]];
+//        isolate *selectedIsolate = (*currentIsolates)[selection];
         isolateSample.push_back(selectedIsolate);
         // record serotype frequencies
         currentSerotypeObservations.push_back(selectedIsolate->serotype);
