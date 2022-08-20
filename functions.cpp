@@ -1220,9 +1220,17 @@ int firstSample(std::vector<isolate*> *currentIsolates,int firstSample,std::ofst
         // print record of sample to file
         int vtInt = 0;
         if (selectedIsolate->latent_vt) {
-            vtInt = 2;
+            if (selectedIsolate->partial_vt) {
+                vtInt = 4;
+            } else {
+                vtInt = 2;
+            }
         } else if (selectedIsolate->vt) {
-            vtInt = 1;
+            if (selectedIsolate->partial_vt) {
+                vtInt = 3;
+            } else {
+                vtInt = 1;
+            }
         }
         sampleOutFile << selectedIsolate->id << "\t" << minGen << "\t" << selectedIsolate->serotype << "\t" << vtInt << "\t" << selectedIsolate->sc << std::endl;
     }
@@ -1923,9 +1931,17 @@ int compareSamples(int gen,int minGen,int sampleSize,std::vector<isolate*> *curr
         // print record of sample to file
         int vtInt = 0;
         if (selectedIsolate->latent_vt) {
-            vtInt = 2;
+            if (selectedIsolate->partial_vt) {
+                vtInt = 4;
+            } else {
+                vtInt = 2;
+            }
         } else if (selectedIsolate->vt) {
-            vtInt = 1;
+            if (selectedIsolate->partial_vt) {
+                vtInt = 3;
+            } else {
+                vtInt = 1;
+            }
         }
         sampleOutFile << selectedIsolate->id << "\t" << gen << "\t" << selectedIsolate->serotype << "\t" << vtInt << "\t" << selectedIsolate->sc << std::endl;
         // calculate gene frequencies
