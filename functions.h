@@ -52,7 +52,7 @@ int parseFrequencyFile(char *frequencyFilename,std::vector<cog*> *accessoryLoci)
 int parseWeightingFile(char* weightingFilename,std::vector<cog*> *accessoryLoci);
 
 // parse ordering file
-int parseOrderingFile(char* orderingFilename,std::vector<cog*> *accessoryLoci,struct parms *sp);
+int parseOrderingFile(char* orderingFilename,std::vector<cog*> *accessoryLoci,struct parms *sp, char* outputFilename);
 
 ////////////////////////////////
 // Pre-processing information //

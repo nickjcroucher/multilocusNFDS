@@ -673,7 +673,7 @@ int parseWeightingFile(char* weightingFilename,std::vector<cog*> *accessoryLoci)
 /////////////////////////////
 
 
-int parseOrderingFile(char* orderingFilename,std::vector<cog*> *accessoryLoci,struct parms *sp) {
+int parseOrderingFile(char* orderingFilename,std::vector<cog*> *accessoryLoci,struct parms *sp, char* outputFilename) {
     
     // reordered list
     std::vector<std::string> orderedAccessoryLoci;
@@ -782,6 +782,24 @@ int parseOrderingFile(char* orderingFilename,std::vector<cog*> *accessoryLoci,st
         std::cerr << "Allowed heterogeneous functions are (l)ogistic, (e)xponential, linea(r) and (s)tep" << std::endl;
         exit(1);
     }
+    
+    // If extended output mode - print out cog weights
+    if (sp->programme == "x") {
+        std::string weightsOutFilename = std::string(outputFilename) + ".locusWeights.csv";
+        std::ofstream weightsOutFile;
+        weightsOutFile.open(weightsOutFilename,std::ios::out);
+        
+        // write serotype output
+        if (weightsOutFile.is_open()) {
+            // write header
+            weightsOutFile << "Locus,Frequency,Weight" << std::endl;
+            for (cit = accessoryLoci->begin(), accessoryLoci->end(); cit != accessoryLoci->end(); ++cit) {
+                weightsOutFile << (*cit)->id << "," << (*cit)->eqFreq << "," << (*cit)->weight << std::endl;
+            }
+            weightsOutFile.close();
+        }
+    }
+    
     return 0;
 }
 
@@ -2731,7 +2749,7 @@ int printOutput(char* outputFilename,std::vector<std::string> *seroList,std::vec
             }
             piOutFile << std::endl;
             // write content
-            for (int pseudoGen = minGen; pseudoGen < (gen+1+minGen); pseudoGen++) {
+            for (int pseudoGen = 0; pseudoGen < (gen-minGen); pseudoGen++) {
                 piOutFile << pseudoGen;
                 for (unsigned int c = 0; c < accessoryLoci->size(); c++) {
                     piOutFile << "\t" << piGen[pseudoGen][c];

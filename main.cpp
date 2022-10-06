@@ -339,7 +339,7 @@ int main(int argc, char * argv[]) {
             return 1;
         }
     } else if (orderingFilename != NULL) {
-        int orderCheck = parseOrderingFile(orderingFilename,accessoryLoci,&p);
+        int orderCheck = parseOrderingFile(orderingFilename,accessoryLoci,&p,outputFilename);
         if (orderCheck != 0) {
             std::cerr << "Unable to parse ordering file" << std::endl;
             usage(argv[0]);
@@ -423,7 +423,7 @@ int main(int argc, char * argv[]) {
     std::vector<std::string> isolateGen;
     std::vector<int> countGen;
     if (p.programme == "x") {
-        piGen.resize(p.numGen+1,std::vector<double>(accessoryLoci->size(),0.0));
+        piGen.resize(p.numGen-minGen,std::vector<double>(accessoryLoci->size(),0.0));
     } else {
         piGen.resize(samplingList->size()+1,std::vector<double>(accessoryLoci->size(),0.0));
     }
