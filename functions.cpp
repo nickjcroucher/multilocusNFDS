@@ -1424,11 +1424,11 @@ int reproduction(std::vector<isolate*> *currentIsolates,std::vector<isolate*> *f
             
             // record isolate fitnesses for extended output
             if (sp->programme == "x" && oldFitness != 0.0) {
-                isolateGen->push_back((*iter)->id);
+                isolateGen->push_back(oldId);
                 fitGen->push_back(oldFitness);
                 timeGen->push_back(gen);
                 countGen->push_back(genotypeCount);
-                genotypeCount = 0;
+                genotypeCount = 1;
             }
             
             std::vector<double> fitnesses(cogDeviations->size());
@@ -1487,6 +1487,8 @@ int reproduction(std::vector<isolate*> *currentIsolates,std::vector<isolate*> *f
             double overallFitness = baseR*vaccineFit*freqDepFit;
             oldFitness = overallFitness;
             oldId = (*iter)->id;
+        } else {
+            genotypeCount++;
         }
         
         (*iter)->fitness = oldFitness;
@@ -2677,7 +2679,7 @@ int printOutput(char* outputFilename,std::vector<std::string> *seroList,std::vec
         }
         scOutFile << std::endl;
         // write values
-        for (int pseudoGen = minGen; pseudoGen < (gen+1+minGen); pseudoGen++) {
+        for (int pseudoGen = 0; pseudoGen < gen; pseudoGen++) {
             scOutFile << pseudoGen;
             for (unsigned int i = 0; i != scList->size(); i++) {
                 scOutFile << "\t" << vtScFreq[pseudoGen-minGen][i] << "\t" << nvtScFreq[pseudoGen-minGen][i];
