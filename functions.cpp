@@ -2682,7 +2682,7 @@ int printOutput(char* outputFilename,std::vector<std::string> *seroList,std::vec
         for (int pseudoGen = 0; pseudoGen < gen; pseudoGen++) {
             scOutFile << pseudoGen;
             for (unsigned int i = 0; i != scList->size(); i++) {
-                scOutFile << "\t" << vtScFreq[pseudoGen-minGen][i] << "\t" << nvtScFreq[pseudoGen-minGen][i];
+                scOutFile << "\t" << vtScFreq[pseudoGen][i] << "\t" << nvtScFreq[pseudoGen][i];
             }
             scOutFile << std::endl;
         }
