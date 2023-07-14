@@ -433,7 +433,7 @@ int main(int argc, char * argv[]) {
     std::vector< std::vector<double> > sampledNvtScFreq(samplingList->size()+1,std::vector<double>(scList.size(),0.0));
     // data structures for COG frequency measurements
     std::vector<double> cogDeviations(eqFreq.size());
-    std::vector<std::vector<double> > cogDeviations_store(p.nfdsLag,std::vector<double>(eqFreq.size()));
+    std::vector<std::vector<double> > cogDeviations_store(eqFreq.size(),std::vector<double>(p.nfdsLag,0.0));
     
     // initialise population in first generation, record simulated population statistics
     int gen = minGen;
@@ -460,8 +460,8 @@ int main(int argc, char * argv[]) {
     }
     
     // fill in cog deviations stored values
-    for (int i = 0; i < p.nfdsLag; i++) {
-        cogDeviations_store[i] = cogDeviations;
+    for (int i = 0; i < eqFreq.size(); i++) {
+        cogDeviations_store[i][0] = cogDeviations[i];
     }
     
     // check if second vaccine formulation is implemented from the start
@@ -528,7 +528,9 @@ int main(int argc, char * argv[]) {
     for (gen = minGen+1; gen <= genLimit; gen++) {
         
         // extract cogDeviations according to NFDS lag interval
-        cogDeviations = cogDeviations_store[p.nfdsLag-1];
+        for (int i = 0; i < eqFreq.size(); i++) {
+          cogDeviations[i] = std::accumulate( cogDeviations_store[i].begin(), cogDeviations_store[i].end(), 0.0)/cogDeviations_store[i].size();
+        }
         
         // prevent further reproduction if population too large
         if (continue_reproducing) {
@@ -689,10 +691,10 @@ int main(int argc, char * argv[]) {
         }
         
         // cogDeviations are updated
-        for (int i = (p.nfdsLag-1); i >= 1; i--) {
-            cogDeviations_store[i] = cogDeviations_store[i-1];
+        for (int i = 0; i < eqFreq.size(); ++i) {
+          cogDeviations_store[i].insert(cogDeviations_store[i].begin(),cogDeviations[i]);
+          cogDeviations_store[i].pop_back();
         }
-        cogDeviations_store[0] = cogDeviations;
         
     }
     
