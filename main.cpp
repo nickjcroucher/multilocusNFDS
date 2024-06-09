@@ -420,6 +420,12 @@ int main(int argc, char * argv[]) {
     std::vector<std::vector<double> > piGen;
     std::vector<double> timeGen;
     std::vector<double> fitGen;
+
+    std::vector<double> dens_fitGen;
+    std::vector<double> vacc_fitGen;
+    std::vector<double> nfds_fitGen;
+    std::vector<double> standardised_fitGen;
+  
     std::vector<std::string> isolateGen;
     std::vector<int> countGen;
     if (p.programme == "x") {
@@ -614,7 +620,8 @@ int main(int argc, char * argv[]) {
             }
             
             // allow cells to reproduce and update COG deviations array
-            int reproCheck = reproduction(currentIsolates,futureIsolates,migrantPool,&cogWeights,&cogDeviations,&p,&eqFreq,&vtScFreq[gen-minGen],&nvtScFreq[gen-minGen],&piGen[gen-minGen],&scList,gen,&timeGen,&fitGen,&isolateGen,&countGen,popLimitFactor,minGen,secondVaccinationGeneration,partialVaccine);
+            int reproCheck = reproduction(currentIsolates,futureIsolates,migrantPool,&cogWeights,&cogDeviations,&p,&eqFreq,&vtScFreq[gen-minGen],&nvtScFreq[gen-minGen],&piGen[gen-minGen],&scList,gen,&timeGen,&fitGen,&isolateGen,&countGen,popLimitFactor,minGen,secondVaccinationGeneration,partialVaccine,
+              &vacc_fitGen,&nfds_fitGen,&dens_fitGen,&standardised_fitGen);
             if (reproCheck == 8888) {
                 std::cerr << "Population exceeded limit at generation " << gen << std::endl;
                 // continue iterations to ensure fitting statistics still incremented
@@ -742,7 +749,7 @@ int main(int argc, char * argv[]) {
     
     // print output files if simulating
     if (p.programme != "f") {
-        int printCheck = printOutput(outputFilename,&serotypeList,sampledSeroFreq,&scList,vtScFreq,nvtScFreq,p.numGen,minGen,accessoryLoci,samplingList,piGen,&p,&timeGen,&fitGen,&isolateGen,&countGen);
+        int printCheck = printOutput(outputFilename,&serotypeList,sampledSeroFreq,&scList,vtScFreq,nvtScFreq,p.numGen,minGen,accessoryLoci,samplingList,piGen,&p,&timeGen,&fitGen,&isolateGen,&countGen, &vacc_fitGen,&nfds_fitGen,&dens_fitGen,&standardised_fitGen);
         if (printCheck != 0) {
             std::cerr << "Could not write to output files" << std::endl;
             usage(argv[0]);
