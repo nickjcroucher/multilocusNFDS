@@ -1367,7 +1367,7 @@ std::vector<int> getValidStrains(std::vector<std::vector<isolate*> > migrantInpu
 }
 
 int reproduction(std::vector<isolate*> *currentIsolates,std::vector<isolate*> *futureIsolates,std::vector<std::vector<std::vector<isolate*> > > *migrantPool, std::vector<double> *cogWeights, std::vector<double> *cogDeviations,struct parms *sp, std::vector<double> * ef, std::vector<int> * vtScFreq,std::vector<int> * nvtScFreq,std::vector<double> * piGen,std::vector<int> *scList, int gen,std::vector<double> * timeGen,std::vector<double> * fitGen,std::vector<std::string> * isolateGen,std::vector<int> * countGen, double popLimitFactor, int minGen, int secondVaccinationGeneration, float partialVaccine,
-  std::vector<double> *vacc_fitGen, std::vector<double> *nfds_fitGen, std::vector<double> *dens_fitGen, std::vector<double> *standardised_fitGen) {
+  std::vector<double> *vacc_fitGen, std::vector<double> *nfds_fitGen, std::vector<double> *dens_fitGen, std::vector<double> *standardised_fitGen, std::vector<double> *nfds_deviation) {
     
     // calculate population limit for memory management
     int popLimit = round(popLimitFactor * double(sp->popSize));
@@ -1429,7 +1429,7 @@ int reproduction(std::vector<isolate*> *currentIsolates,std::vector<isolate*> *f
             double freqDepFitSum = std::accumulate(fitnesses.begin(),fitnesses.end(),0.0);
             double freqDepFit = pow((1+sp->fSelection),freqDepFitSum);
             double vaccineFit = 1.0;
-            
+                      
             // only switch on vaccine selection pressure after vaccine is introduced
             if (gen >= 0 && (*iter)->vt) {
                 // if vaccine lag, then only apply to latent_vt for the second vaccine
@@ -1474,24 +1474,24 @@ int reproduction(std::vector<isolate*> *currentIsolates,std::vector<isolate*> *f
                     }
                 }
             }
-            
-            // record isolate fitnesses for extended output
-            if (sp->programme == "x" && oldFitness != 0.0) {
-                isolateGen->push_back(oldId);
-                fitGen->push_back(oldFitness);
-                timeGen->push_back(gen);
-                countGen->push_back(genotypeCount);
-              
-                vacc_fitGen->push_back(vaccineFit);
-                nfds_fitGen->push_back(freqDepFit);
-                
-                genotypeCount = 1;
-            }
-          
+                                
             // calculate overall fitness
             double overallFitness = baseR*vaccineFit*freqDepFit;
             oldFitness = overallFitness;
             oldId = (*iter)->id;
+            
+            // record isolate fitnesses for extended output
+            if (sp->programme == "x" && oldFitness != 0.0) {
+                isolateGen->push_back((*iter)->id);
+                fitGen->push_back(overallFitness);
+                timeGen->push_back(gen);
+                countGen->push_back(genotypeCount);
+                vacc_fitGen->push_back(vaccineFit);
+                nfds_fitGen->push_back(freqDepFit);
+                nfds_deviation->push_back(freqDepFitSum);
+                genotypeCount = 1;
+            }
+          
         } else {
             genotypeCount++;
         }
@@ -2636,7 +2636,7 @@ int rFitMetricCalculation(int minGen,std::vector<int> *samplingList,std::vector<
 // write output to files //
 ///////////////////////////
 
-int printOutput(char* outputFilename,std::vector<std::string> *seroList,std::vector<std::vector<int> > &sampledSeroFreq,std::vector<int> *scList,std::vector<std::vector<int> > &vtScFreq,std::vector<std::vector<int> > &nvtScFreq,int gen,int minGen,std::vector<cog*> *accessoryLoci,std::vector<int> *samplingList,std::vector<std::vector<double> > &piGen,struct parms *sp,std::vector<double> * timeGen,std::vector<double> * fitGen,std::vector<std::string> * isolateGen,std::vector<int> * countGen,std::vector<double> * vacc_fitGen,std::vector<double> * nfds_fitGen,std::vector<double> * dens_fitGen,std::vector<double> * standardised_fitGen) {
+int printOutput(char* outputFilename,std::vector<std::string> *seroList,std::vector<std::vector<int> > &sampledSeroFreq,std::vector<int> *scList,std::vector<std::vector<int> > &vtScFreq,std::vector<std::vector<int> > &nvtScFreq,int gen,int minGen,std::vector<cog*> *accessoryLoci,std::vector<int> *samplingList,std::vector<std::vector<double> > &piGen,struct parms *sp,std::vector<double> * timeGen,std::vector<double> * fitGen,std::vector<std::string> * isolateGen,std::vector<int> * countGen,std::vector<double> * vacc_fitGen,std::vector<double> * nfds_fitGen,std::vector<double> * dens_fitGen,std::vector<double> * standardised_fitGen, std::vector<double> *nfds_deviation) {
     
     // debug
 //    for (unsigned int y = 0; y < samplingList->size(); y++) {
@@ -2787,10 +2787,10 @@ int printOutput(char* outputFilename,std::vector<std::string> *seroList,std::vec
         // write pi output
         if (fitOutFile.is_open()) {
             // write header
-            fitOutFile << "Gen\tIsolate\tCount\tVaccine_fitness\tDensity_fitness\tNFDS_fitness\tFitness\tStandardised_fitness" << std::endl;
+            fitOutFile << "Gen\tIsolate\tCount\tVaccine_fitness\tDensity_fitness\tNFDS_fitness\tNFDS_deviation\tFitness\tStandardised_fitness" << std::endl;
             // write content
             for (int index = 0; index < timeGen->size(); index++) {
-                fitOutFile << (*timeGen)[index] << "\t" << (*isolateGen)[index] << "\t" << (*countGen)[index] << "\t" << (*vacc_fitGen)[index] << "\t" << (*dens_fitGen)[index] << "\t" << (*nfds_fitGen)[index] << "\t" << (*fitGen)[index] << "\t" << (*standardised_fitGen)[index] << std::endl;
+                fitOutFile << (*timeGen)[index] << "\t" << (*isolateGen)[index] << "\t" << (*countGen)[index] << "\t" << (*vacc_fitGen)[index] << "\t" << (*dens_fitGen)[index] << "\t" << (*nfds_fitGen)[index] << "\t" << (*nfds_deviation)[index] << "\t" << (*fitGen)[index] << "\t" << (*standardised_fitGen)[index] << std::endl;
             }
             // close
             fitOutFile.close();
