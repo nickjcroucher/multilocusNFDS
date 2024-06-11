@@ -685,7 +685,8 @@ int main(int argc, char * argv[]) {
 //                        strainFittingStatsList.push_back(log(2));
 //                    }
                     numberComparisons++;
-                } else if (p.programme == "f" || p.programme == "b") {
+                }
+                if (p.programme == "f" || p.programme == "b" || p.programme == "x") {
                     int justRecordStatsCheck = justRecordStats(gen,minGen,(*samplingList)[gen-minGen],currentIsolates,accessoryLoci);
                     if (justRecordStatsCheck != 0) {
                         std::cerr << "Unable to record simulation statistics" << std::endl;
