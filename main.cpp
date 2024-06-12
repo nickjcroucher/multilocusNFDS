@@ -50,7 +50,7 @@ int main(int argc, char * argv[]) {
     p.het_mode = "s";
     p.densdepMode = 0;
     p.vaccineLag = 0;
-    p.nfdsLag = 1;
+    p.nfdsLag = 0;
     
     ////////////////////////
     // Parse command line //
@@ -440,7 +440,7 @@ int main(int argc, char * argv[]) {
     std::vector< std::vector<double> > sampledNvtScFreq(samplingList->size()+1,std::vector<double>(scList.size(),0.0));
     // data structures for COG frequency measurements
     std::vector<double> cogDeviations(eqFreq.size());
-    std::vector<std::vector<double> > cogDeviations_store(eqFreq.size(),std::vector<double>(p.nfdsLag,0.0));
+    std::vector<std::vector<double> > cogDeviations_store(eqFreq.size(),std::vector<double>(p.nfdsLag+1,0.0));
     
     // initialise population in first generation, record simulated population statistics
     int gen = minGen;

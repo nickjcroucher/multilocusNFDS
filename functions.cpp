@@ -1426,6 +1426,7 @@ int reproduction(std::vector<isolate*> *currentIsolates,std::vector<isolate*> *f
             std::vector<double> fitnesses(cogDeviations->size());
             
             std::transform(cogDeviations->begin(), cogDeviations->end(), (*iter)->genotype.begin(), fitnesses.begin(), std::multiplies<double>());
+          
             double freqDepFitSum = std::accumulate(fitnesses.begin(),fitnesses.end(),0.0);
             double freqDepFit = pow((1+sp->fSelection),freqDepFitSum);
             double vaccineFit = 1.0;
