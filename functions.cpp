@@ -216,7 +216,7 @@ int parseInputFile(std::vector<isolate*> *pop, std::vector<cog*> *accessoryLoci,
                     for (unsigned int j = 0; j < tmpCogList.size(); j++) {
                         if ((*cogList)[i] == tmpCogList[j]) {
                             match_pos = j;
-                            j = tmpCogList.size();
+                            break;
                         }
                     }
                     if (match_pos == -1) {
@@ -233,7 +233,8 @@ int parseInputFile(std::vector<isolate*> *pop, std::vector<cog*> *accessoryLoci,
             for (iiter = pop->begin(), pop->end() ; iiter != pop->end(); ++iiter) {
                 std::vector<bool> tmpGenotype;
                 for (unsigned int j = 0; j < cogMatches.size(); j++) {
-                    tmpGenotype.push_back((*iiter)->genotype[j]);
+                    int cogIndex = cogMatches[j];
+                    tmpGenotype.push_back((*iiter)->genotype[cogIndex]);
                 }
                 (*iiter)->genotype = tmpGenotype;
             }
