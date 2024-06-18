@@ -536,8 +536,8 @@ bool checkInputValues(struct parms *sp,char * inputFilename,char * vtCogName, ch
         std::cerr << "Vaccine lag (in months) must be equal to or greater than zero" << std::endl;
         tmpvalid = 0;
     }
-    if (sp->nfdsLag < 1) {
-        std::cerr << "NFDS lag (in months) must be equal to or greater than one" << std::endl;
+    if (sp->nfdsLag < 0) {
+        std::cerr << "NFDS lag (in months) must be equal to or greater than zero" << std::endl;
         tmpvalid = 0;
     }
     // check recombination parameters
