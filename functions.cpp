@@ -98,6 +98,7 @@ int parseInputFile(std::vector<isolate*> *pop, std::vector<cog*> *accessoryLoci,
             bool sample_vt = 0;
             bool sample_latent_vt = 0;
             bool partial_vt = 0;
+            bool partial_latent_vt = 0;
             std::vector<bool> sample_genotype;
             std::string iname;
             std::istringstream iss(line);
@@ -121,22 +122,27 @@ int parseInputFile(std::vector<isolate*> *pop, std::vector<cog*> *accessoryLoci,
                             sample_vt = false;
                             sample_latent_vt = false;
                             partial_vt = false;
+                            partial_latent_vt = false;
                         } else  if (vt_int == 1) {
                             sample_vt = true;
                             sample_latent_vt = false;
                             partial_vt = false;
+                            partial_latent_vt = false;
                         } else if (vt_int == 2) {
                             sample_vt = false;
                             sample_latent_vt = true;
                             partial_vt = false;
+                            partial_latent_vt = false;
                         } else  if (vt_int == 3) {
                             sample_vt = true;
                             sample_latent_vt = false;
                             partial_vt = true;
+                            partial_latent_vt = false;
                         } else if (vt_int == 4) {
                             sample_vt = false;
-                            sample_latent_vt = true;
-                            partial_vt = true;
+                            sample_latent_vt = false;
+                            partial_vt = false;
+                            partial_latent_vt = true;
                         } else {
                             std::cerr << "Unknown VT status for " << sample_id << std::endl;
                         }
@@ -166,6 +172,7 @@ int parseInputFile(std::vector<isolate*> *pop, std::vector<cog*> *accessoryLoci,
                                            sample_vt,
                                            sample_latent_vt,
                                            partial_vt,
+                                           partial_latent_vt,
                                            &sample_genotype,
                                            &sample_markers,
                                            1.0);
@@ -1247,11 +1254,9 @@ int firstSample(std::vector<isolate*> *currentIsolates,int firstSample,std::ofst
         // print record of sample to file
         int vtInt = 0;
         if (selectedIsolate->latent_vt) {
-            if (selectedIsolate->partial_vt) {
-                vtInt = 4;
-            } else {
-                vtInt = 2;
-            }
+            vtInt = 2;
+        } else if (selectedIsolate->partial_latent_vt) {
+            vtInt = 4;
         } else if (selectedIsolate->vt) {
             if (selectedIsolate->partial_vt) {
                 vtInt = 3;
@@ -1320,14 +1325,14 @@ int alterVaccineFormulation(std::vector<isolate*> *currentIsolates,std::vector<i
     // change VT of current population
     for (iter = currentIsolates->begin(), currentIsolates->end(); iter != currentIsolates->end(); ++iter) {
         if (!(*iter)->vt) {
-            (*iter)->vt = (*iter)->latent_vt;
+            (*iter)->vt = ((*iter)->latent_vt || (*iter)->partial_latent_vt);
         }
     }
     
     // change VT of underlying population
     for (iter = pop->begin(), pop->end(); iter != pop->end(); ++iter) {
         if (!(*iter)->vt) {
-            (*iter)->vt = (*iter)->latent_vt;
+            (*iter)->vt = ((*iter)->latent_vt || (*iter)->partial_latent_vt);
         }
     }
     
@@ -1336,7 +1341,7 @@ int alterVaccineFormulation(std::vector<isolate*> *currentIsolates,std::vector<i
         for (unsigned int j = 0; j < (*popBySc)[i].size(); j++) {
             for (iter = (*popBySc)[i][j].begin(), (*popBySc)[i][j].end(); iter != (*popBySc)[i][j].end(); ++iter) {
                 if (!(*iter)->vt) {
-                    (*iter)->vt = (*iter)->latent_vt;
+                    (*iter)->vt = ((*iter)->latent_vt || (*iter)->partial_latent_vt);
                 }
             }
         }
@@ -1403,7 +1408,8 @@ int reproduction(std::vector<isolate*> *currentIsolates,std::vector<isolate*> *f
     std::vector<int> futureNvtScs;
     std::vector<std::string> futureSerotypes;
     int genotypeCount = 0;
-    
+    std::string current_serotype;
+  
     // basic reproduction number based on immigration and population size
     double baseR = (1-sp->immigrationRate);
 
@@ -1431,7 +1437,8 @@ int reproduction(std::vector<isolate*> *currentIsolates,std::vector<isolate*> *f
             double freqDepFitSum = std::accumulate(fitnesses.begin(),fitnesses.end(),0.0);
             double freqDepFit = pow((1+sp->fSelection),freqDepFitSum);
             double vaccineFit = 1.0;
-                      
+            current_serotype = (*iter)->serotype;
+          
             // only switch on vaccine selection pressure after vaccine is introduced
             if (gen >= 0 && (*iter)->vt) {
                 // if vaccine lag, then only apply to latent_vt for the second vaccine
@@ -1439,16 +1446,20 @@ int reproduction(std::vector<isolate*> *currentIsolates,std::vector<isolate*> *f
                     if (gen >= secondVaccinationGeneration) {
                         // Here it is assumed anything cross-reactive in first vaccine
                         // is included in the second vaccine - needs to be fixed
-                        if ((*iter)->latent_vt || (*iter)->partial_vt) {
+                        if ((*iter)->partial_latent_vt || (*iter)->latent_vt) {
                             // reduced selection on serotypes unique to second vaccine
                             if ((*iter)->latent_vt) {
                                 if ((*iter)->partial_vt) {
-                                    vaccineFit = 1.0 - (secondVaccineSelection*partialVaccine);
+                                    vaccineFit = 1.0 - secondVaccineSelection - (firstVaccineSelection*partialVaccine);
                                 } else {
                                     vaccineFit = 1.0 - secondVaccineSelection;
                                 }
-                            } else {
-                                vaccineFit = 1.0 - secondVaccineSelection;
+                            } else if ((*iter)->partial_latent_vt) {
+                                if ((*iter)->partial_vt) {
+                                    vaccineFit = 1.0 - (secondVaccineSelection*partialVaccine) - (firstVaccineSelection*partialVaccine);
+                                } else {
+                                    vaccineFit = 1.0 - (secondVaccineSelection*partialVaccine);
+                                }
                             }
                         } else {
                             // full selection on serotypes in first vaccine
@@ -1469,14 +1480,19 @@ int reproduction(std::vector<isolate*> *currentIsolates,std::vector<isolate*> *f
                         }
                     }
                 } else {
-                    if ((*iter)->partial_vt) {
-                        vaccineFit = 1.0 - sp->vSelection*partialVaccine;
-                    } else {
+                    if ((gen >= 0 && (*iter)->vt) || (gen >= secondVaccinationGeneration && (*iter)->latent_vt)) {
                         vaccineFit = 1.0 - sp->vSelection;
+                    } else if ((gen >= 0 && (*iter)->partial_vt) || (gen >= secondVaccinationGeneration && (*iter)->partial_latent_vt)) {
+                        vaccineFit = 1.0 - sp->vSelection*partialVaccine;
                     }
                 }
             }
-                                
+            
+            // check combined effect of first and second vaccines is not >1
+            if (vaccineFit < 0) {
+              vaccineFit = 0;
+            }
+          
             // calculate overall fitness
             double overallFitness = baseR*vaccineFit*freqDepFit;
             oldFitness = overallFitness;
@@ -1805,6 +1821,7 @@ int recombination(std::vector<isolate*> *currentIsolates,std::vector<isolate*> *
                                            recipient.vt,
                                            recipient.latent_vt,
                                            recipient.partial_vt,
+                                           recipient.partial_latent_vt,
                                            &recipient.genotype,
                                            &recipient.markers,
                                            recipient.fitness
@@ -1983,17 +2000,21 @@ int compareSamples(int gen,int minGen,int sampleSize,std::vector<isolate*> *curr
         // print record of sample to file
         int vtInt = 0;
         if (selectedIsolate->latent_vt) {
-            if (selectedIsolate->partial_vt) {
+            if (selectedIsolate->partial_latent_vt) {
                 vtInt = 4;
             } else {
                 vtInt = 2;
             }
+        } else if (selectedIsolate->partial_latent_vt) {
+            vtInt = 4;
         } else if (selectedIsolate->vt) {
             if (selectedIsolate->partial_vt) {
                 vtInt = 3;
             } else {
                 vtInt = 1;
             }
+        } else if (selectedIsolate->partial_vt) {
+            vtInt = 3;
         }
         sampleOutFile << selectedIsolate->id << "\t" << gen << "\t" << selectedIsolate->serotype << "\t" << vtInt << "\t" << selectedIsolate->sc << std::endl;
         // calculate gene frequencies
