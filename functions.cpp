@@ -1408,8 +1408,7 @@ int reproduction(std::vector<isolate*> *currentIsolates,std::vector<isolate*> *f
     std::vector<int> futureNvtScs;
     std::vector<std::string> futureSerotypes;
     int genotypeCount = 0;
-    std::string current_serotype;
-  
+
     // basic reproduction number based on immigration and population size
     double baseR = (1-sp->immigrationRate);
 
@@ -1437,7 +1436,6 @@ int reproduction(std::vector<isolate*> *currentIsolates,std::vector<isolate*> *f
             double freqDepFitSum = std::accumulate(fitnesses.begin(),fitnesses.end(),0.0);
             double freqDepFit = pow((1+sp->fSelection),freqDepFitSum);
             double vaccineFit = 1.0;
-            current_serotype = (*iter)->serotype;
           
             // only switch on vaccine selection pressure after vaccine is introduced
             if (gen >= 0 && (*iter)->vt) {
