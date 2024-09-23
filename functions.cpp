@@ -1419,6 +1419,7 @@ int reproduction(std::vector<isolate*> *currentIsolates,std::vector<isolate*> *f
     // allow old generation to reproduce
     std::string oldId = "";
     double oldFitness = 0.0;
+    bool first_genotype_seen = false;
     
     // Store non-standardised fitnesses
     std::vector<double> unstandardised_fitnesses;
@@ -1497,14 +1498,17 @@ int reproduction(std::vector<isolate*> *currentIsolates,std::vector<isolate*> *f
             oldId = (*iter)->id;
             
             // record isolate fitnesses for extended output
-            if (sp->programme == "x" && oldFitness != 0.0) {
+            if (sp->programme == "x") {
                 isolateGen->push_back((*iter)->id);
                 fitGen->push_back(overallFitness);
                 timeGen->push_back(gen);
-                countGen->push_back(genotypeCount);
                 vacc_fitGen->push_back(vaccineFit);
                 nfds_fitGen->push_back(freqDepFit);
                 nfds_deviation->push_back(freqDepFitSum);
+                if (first_genotype_seen) {
+                  countGen->push_back(genotypeCount);
+                }
+                first_genotype_seen = true;
                 genotypeCount = 1;
             }
           
@@ -1517,6 +1521,11 @@ int reproduction(std::vector<isolate*> *currentIsolates,std::vector<isolate*> *f
         
     }
     
+    // Record final genotype count
+    if (sp->programme == "x") {
+      countGen->push_back(genotypeCount);
+    }
+  
     // Standardise fitnesses for density dependent-regulation
     double standardisation_factor = 1.0;
     if (sp->densdepMode == 0) {
