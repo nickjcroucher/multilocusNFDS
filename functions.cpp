@@ -1407,7 +1407,7 @@ int reproduction(std::vector<isolate*> *currentIsolates,std::vector<isolate*> *f
     std::vector<int> futureVtScs;
     std::vector<int> futureNvtScs;
     std::vector<std::string> futureSerotypes;
-    int genotypeCount = 0;
+    int genotypeCount = 1;
 
     // basic reproduction number based on immigration and population size
     double baseR = (1-sp->immigrationRate);
@@ -1547,7 +1547,6 @@ int reproduction(std::vector<isolate*> *currentIsolates,std::vector<isolate*> *f
             }
             futureSerotypes.push_back((*iter)->serotype);
         }
-        genotypeCount++;
         
         // record isolate fitnesses for extended output
         if (sp->programme == "x" && (*iter)->id != oldId) {
@@ -1574,7 +1573,7 @@ int reproduction(std::vector<isolate*> *currentIsolates,std::vector<isolate*> *f
     // allow for immigration
     double adjustedImmigrationRate = (sp->immigrationRate)*(double(sp->popSize)/double(currentIsolates->size()));
     int immigrants = gsl_ran_binomial(rgen,adjustedImmigrationRate,sp->popSize);
-    
+  
     // if mode == 2 immigration, chose the timestep
     // from which to select the migrants
     int migration_gen = -1;
@@ -1629,7 +1628,7 @@ int reproduction(std::vector<isolate*> *currentIsolates,std::vector<isolate*> *f
 
         // select isolates
         isolate* selectedIsolate = (*candidates)[selection];
-        
+      
         futureIsolates->push_back(selectedIsolate);
         // record statistics
         if (selectedIsolate->vt) {
