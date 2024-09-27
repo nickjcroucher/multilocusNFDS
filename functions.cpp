@@ -2024,8 +2024,8 @@ int compareSamples(int gen,int minGen,int sampleSize,std::vector<isolate*> *curr
         }
         sampleOutFile << selectedIsolate->id << "\t" << gen << "\t" << selectedIsolate->serotype << "\t" << vtInt << "\t" << selectedIsolate->sc << std::endl;
         // calculate gene frequencies
-        for (unsigned int i = 0; i < selectedIsolate->genotype.size();i++) {
-            (*accessoryLoci)[i]->simFreq[gen-minGen]+=(double(selectedIsolate->genotype[i])/double(sampleSize));
+        for (unsigned int j = 0; j < selectedIsolate->genotype.size();j++) {
+            (*accessoryLoci)[i]->simFreq[gen-minGen]+=(double(selectedIsolate->genotype[j])/double(sampleSize));
         }
     }
     
