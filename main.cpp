@@ -225,7 +225,7 @@ int main(int argc, char * argv[]) {
     std::vector<cog*> *accessoryLoci = new std::vector<cog*>;
     std::vector<int> *samplingList = new std::vector<int>;
     std::vector<std::string> serotypeList;
-    std::vector<int> scList;
+    std::vector<std::string> scList;
     std::vector<std::string> cogList;
     int minGen = 0;
     
@@ -253,7 +253,7 @@ int main(int argc, char * argv[]) {
     std::vector<cog*> *migrant_accessoryLoci = new std::vector<cog*>;
     std::vector<int> *migrant_samplingList = new std::vector<int>;
     std::vector<std::string> migrant_serotypeList;
-    std::vector<int> migrant_scList;
+    std::vector<std::string> migrant_scList;
     std::vector< std::vector<int> > migrant_times(p.numGen);
     int migrant_minGen = 0;
     
@@ -267,13 +267,13 @@ int main(int argc, char * argv[]) {
         // update SC list
         scList.insert(scList.end(),migrant_scList.begin(),migrant_scList.end());
         sort(scList.begin(), scList.end());
-        std::vector<int>::iterator it;
+        std::vector<std::string>::iterator it;
         it = std::unique(scList.begin(), scList.end());
         scList.resize(std::distance(scList.begin(),it));
     }
     
     // get final max SC num
-    int maxScNum = 1+(*std::max_element(scList.begin(),scList.end()));
+  int maxScNum = scList.size();
     
     // parse migrant marker file
     if (markerFilename != NULL) {
@@ -359,7 +359,7 @@ int main(int argc, char * argv[]) {
     // disease data for fitting to epi information
     std::vector<int> *diseaseTime = new std::vector<int>;
     std::vector<std::string> *diseaseSeroList = new std::vector<std::string>;
-    std::vector<int> *diseaseScList = new std::vector<int>;
+    std::vector<std::string> *diseaseScList = new std::vector<std::string>;
     std::vector<int> *diseaseVt = new std::vector<int>;
     std::vector<double> *diseaseInvasiveness = new std::vector<double>;
     std::vector<int> *diseasePopulation = new std::vector<int>;

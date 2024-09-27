@@ -72,7 +72,7 @@ void usage (char* fn) {
 // parse input file //
 //////////////////////
 
-int parseInputFile(std::vector<isolate*> *pop, std::vector<cog*> *accessoryLoci, double lower, double upper,  std::vector<int> *samplingList,std::vector<std::string> *st, std::vector<int> *sc, std::vector<std::string> *cogList, char *inputFilename, char * vtCogName, int &minGen, bool useCogList) {
+int parseInputFile(std::vector<isolate*> *pop, std::vector<cog*> *accessoryLoci, double lower, double upper,  std::vector<int> *samplingList,std::vector<std::string> *st, std::vector<std::string> *sc, std::vector<std::string> *cogList, char *inputFilename, char * vtCogName, int &minGen, bool useCogList) {
     
     // indices
     int s = 0;
@@ -93,7 +93,7 @@ int parseInputFile(std::vector<isolate*> *pop, std::vector<cog*> *accessoryLoci,
             // temporary information stores
             std::string sample_id;
             int sample_time = -1;
-            int sample_sc = -1;
+            std::string sample_sc = "noSc";
             std::string sample_serotype = "noSero";
             bool sample_vt = 0;
             bool sample_latent_vt = 0;
@@ -147,7 +147,7 @@ int parseInputFile(std::vector<isolate*> *pop, std::vector<cog*> *accessoryLoci,
                             std::cerr << "Unknown VT status for " << sample_id << std::endl;
                         }
                     } else if (sIndex == 4) {
-                        sample_sc = atoi(temp.c_str());
+                        sample_sc = temp;
                     } else if (sIndex > 4) {
                         if (iname == "Taxon") {
                             // record COG names
@@ -163,7 +163,7 @@ int parseInputFile(std::vector<isolate*> *pop, std::vector<cog*> *accessoryLoci,
                     sIndex++;
                 }
             }
-            if (iname != "Taxon" && sample_time != -1 && sample_sc != -1 && sample_serotype.compare("noSero") != 0) {
+            if (iname != "Taxon" && sample_time != -1 && sample_sc.compare("noSc") != 0 && sample_serotype.compare("noSero") != 0) {
                 std::vector<bool> sample_markers(0);
                 isolate* tmp = new isolate(sample_id,
                                            sample_time,
@@ -819,7 +819,7 @@ int parseOrderingFile(char* orderingFilename,std::vector<cog*> *accessoryLoci,st
 // Generate migrant pool //
 ///////////////////////////
 
-int generateMigrantPool(std::vector<std::vector<std::vector<isolate*> > > *migrantPool, std::vector<isolate*> *population, std::vector<isolate*> *migrant_population, char* migrantFilename, std::vector<int> *scList, int maxScNum, int minGen,struct parms *p) {
+int generateMigrantPool(std::vector<std::vector<std::vector<isolate*> > > *migrantPool, std::vector<isolate*> *population, std::vector<isolate*> *migrant_population, char* migrantFilename, std::vector<std::string> *scList, int maxScNum, int minGen,struct parms *p) {
     
     // Split population for immigration by SC
     if (p->immigrationType == 1) {
@@ -902,7 +902,7 @@ int generateMigrantPool(std::vector<std::vector<std::vector<isolate*> > > *migra
 // divide isolates by SC for immigration //
 ///////////////////////////////////////////
 
-int dividePopulationForImmigration(std::vector<isolate*> *pop,std::vector <int> *scList,std::vector<std::vector<isolate*> > *popBySc, int maxScNum) {
+int dividePopulationForImmigration(std::vector<isolate*> *pop,std::vector <std::string> *scList,std::vector<std::vector<isolate*> > *popBySc, int maxScNum) {
     
     // check there are > 0 sequence clusters
     if (maxScNum == 0) {
@@ -955,14 +955,14 @@ int dividePopulationForImmigrationByTime(std::vector<isolate*> *pop, int minGen,
 // get first year sample //
 ///////////////////////////
 
-int getStartingIsolates(std::vector<isolate*> *pop,struct parms *sp,std::vector<isolate*> *first,std::vector<cog*> *accessoryLoci,int psize,std::vector<double> &eqFreq,std::vector<double> &cogWeights,std::vector<double> &cogDeviations,std::vector<int> &startingVtScFrequencies,std::vector<int> &startingNvtScFrequencies,std::vector<int> *scList, int minGen, float seedStartingPopulation, char* migrantFilename, std::vector<isolate*> *migrant_population, int maxScNum) {
+int getStartingIsolates(std::vector<isolate*> *pop,struct parms *sp,std::vector<isolate*> *first,std::vector<cog*> *accessoryLoci,int psize,std::vector<double> &eqFreq,std::vector<double> &cogWeights,std::vector<double> &cogDeviations,std::vector<int> &startingVtScFrequencies,std::vector<int> &startingNvtScFrequencies,std::vector<std::string> *scList, int minGen, float seedStartingPopulation, char* migrantFilename, std::vector<isolate*> *migrant_population, int maxScNum) {
     
     // get all isolates observed in the pre- or peri-vaccine samples
     std::vector<isolate*> *possibleFirst = new std::vector<isolate*>;
     std::vector<isolate*> *possibleFirst_unsampled = new std::vector<isolate*>;
     std::vector<isolate*>::iterator iter;
-    std::vector<int> observedVtSc;
-    std::vector<int> observedNvtSc;
+    std::vector<std::string> observedVtSc;
+    std::vector<std::string> observedNvtSc;
     
     int first_sample_size = 0;
     for (iter = pop->begin(), pop->end() ; iter != pop->end(); ++iter) {
@@ -1131,7 +1131,7 @@ int getStartingIsolates(std::vector<isolate*> *pop,struct parms *sp,std::vector<
                 std::vector<isolate*>::iterator first_iter;
                 for (int strain_index = 0; strain_index < scList->size(); strain_index++) {
                     // first check whether the strain has been observed at the starting timepoint
-                    int sc = (*scList)[strain_index];
+                    std::string sc = (*scList)[strain_index];
                     bool seen = 0;
                     for (first_iter = possibleFirst->begin(), possibleFirst->end() ; first_iter != possibleFirst->end(); ++first_iter) {
                         if ((*first_iter)->sc == sc) {
@@ -1171,7 +1171,7 @@ int getStartingIsolates(std::vector<isolate*> *pop,struct parms *sp,std::vector<
             // iterate up to the determined sample size
             for (int index = 0; index < unseen_sc.size(); index++) {
                 int unseen_strain_index = unseen_sc[index];
-                int unseen_sc_number = (*scList)[unseen_strain_index];
+                std::string unseen_sc_number = (*scList)[unseen_strain_index];
                 for (int unsampled_index = 0; unsampled_index < number_of_unsampled_bacteria; unsampled_index++) {
                     int selection = int(double(gsl_rng_uniform(rgen))*int((*isolates_for_seeding)[unseen_strain_index].size()));
                     isolate *selected_isolate = (*isolates_for_seeding)[unseen_strain_index][selection];
@@ -1278,12 +1278,12 @@ int firstSample(std::vector<isolate*> *currentIsolates,int firstSample,std::ofst
 // get summary statistics per generation //
 ///////////////////////////////////////////
 
-int summariseGeneration(std::vector<isolate*> *pop,int sampleSize,std::vector<int> *scs,std::vector< std::vector<double> > &sampledVtScFreq,std::vector< std::vector<double> > &sampledNvtScFreq,std::vector<std::string> *seros,std::vector<int> *serotypeF) {
+int summariseGeneration(std::vector<isolate*> *pop,int sampleSize,std::vector<std::string> *scs,std::vector< std::vector<double> > &sampledVtScFreq,std::vector< std::vector<double> > &sampledNvtScFreq,std::vector<std::string> *seros,std::vector<int> *serotypeF) {
 
     // record sequence clusters and serotypes from random sample
     std::vector<std::string> genSerotypes;
-    std::vector<int> sampledVtSequenceClusters;
-    std::vector<int> sampledNvtSequenceClusters;
+    std::vector<std::string> sampledVtSequenceClusters;
+    std::vector<std::string> sampledNvtSequenceClusters;
     
     // select random sample and record sequence clusters and serotypes
     for (int i = 0; i <= sampleSize; ++i) {
@@ -1372,7 +1372,7 @@ std::vector<int> getValidStrains(std::vector<std::vector<isolate*> > migrantInpu
     
 }
 
-int reproduction(std::vector<isolate*> *currentIsolates,std::vector<isolate*> *futureIsolates,std::vector<std::vector<std::vector<isolate*> > > *migrantPool, std::vector<double> *cogWeights, std::vector<double> *cogDeviations,struct parms *sp, std::vector<double> * ef, std::vector<int> * vtScFreq,std::vector<int> * nvtScFreq,std::vector<double> * piGen,std::vector<int> *scList, int gen,std::vector<double> * timeGen,std::vector<double> * fitGen,std::vector<std::string> * isolateGen,std::vector<int> * countGen, double popLimitFactor, int minGen, int secondVaccinationGeneration, float partialVaccine,
+int reproduction(std::vector<isolate*> *currentIsolates,std::vector<isolate*> *futureIsolates,std::vector<std::vector<std::vector<isolate*> > > *migrantPool, std::vector<double> *cogWeights, std::vector<double> *cogDeviations,struct parms *sp, std::vector<double> * ef, std::vector<int> * vtScFreq,std::vector<int> * nvtScFreq,std::vector<double> * piGen,std::vector<std::string> *scList, int gen,std::vector<double> * timeGen,std::vector<double> * fitGen,std::vector<std::string> * isolateGen,std::vector<int> * countGen, double popLimitFactor, int minGen, int secondVaccinationGeneration, float partialVaccine,
   std::vector<double> *vacc_fitGen, std::vector<double> *nfds_fitGen, std::vector<double> *dens_fitGen, std::vector<double> *standardised_fitGen, std::vector<double> *nfds_deviation) {
     
     // calculate population limit for memory management
@@ -1404,8 +1404,8 @@ int reproduction(std::vector<isolate*> *currentIsolates,std::vector<isolate*> *f
     std::fill (futureCogCount.begin(),futureCogCount.end(),0);
     
     // record population statistics
-    std::vector<int> futureVtScs;
-    std::vector<int> futureNvtScs;
+    std::vector<std::string> futureVtScs;
+    std::vector<std::string> futureNvtScs;
     std::vector<std::string> futureSerotypes;
     int genotypeCount = 1;
 
@@ -1973,13 +1973,13 @@ int nextGeneration(std::vector<isolate*> *pop,std::vector<isolate*> *new_pop,std
 // Compare simulation and genomic samples //
 ////////////////////////////////////////////
 
-int compareSamples(int gen,int minGen,int sampleSize,std::vector<isolate*> *currentIsolates,std::vector<isolate*> *pop,std::vector<cog*> *accessoryLoci,std::vector<int> &scList,std::vector< std::vector<double> > &sampledVtScFreq,std::vector< std::vector<double> > &sampledNvtScFreq,std::vector<int> &sampledSeroFreq,std::vector<std::string> &serotypeList,std::vector<double> &vtCogFittingStatsList,std::vector<double> &nvtCogFittingStatsList,std::vector<double> &strainFittingStatsList,std::ofstream& sampleOutFile,struct parms *sp) {
+int compareSamples(int gen,int minGen,int sampleSize,std::vector<isolate*> *currentIsolates,std::vector<isolate*> *pop,std::vector<cog*> *accessoryLoci,std::vector<std::string> &scList,std::vector< std::vector<double> > &sampledVtScFreq,std::vector< std::vector<double> > &sampledNvtScFreq,std::vector<int> &sampledSeroFreq,std::vector<std::string> &serotypeList,std::vector<double> &vtCogFittingStatsList,std::vector<double> &nvtCogFittingStatsList,std::vector<double> &strainFittingStatsList,std::ofstream& sampleOutFile,struct parms *sp) {
     
     // data structures for sample
     std::vector<isolate*> isolateSample;
     std::vector<std::string> currentSerotypeObservations;
-    std::vector<int> currentVtScObservations;
-    std::vector<int> currentNvtScObservations;
+    std::vector<std::string> currentVtScObservations;
+    std::vector<std::string> currentNvtScObservations;
     
     // generate list of consecutive integers and shuffle
     std::vector<int> v(currentIsolates->size()) ;
@@ -2256,7 +2256,7 @@ int compareSamples(int gen,int minGen,int sampleSize,std::vector<isolate*> *curr
 int parse_disease_data(char* epiFilename,
                        std::vector<int> *diseaseTime,
                        std::vector<std::string> *diseaseSeroList,
-                       std::vector<int> *diseaseScList,
+                       std::vector<std::string> *diseaseScList,
                        std::vector<int> *diseaseVt,
                        std::vector<double> *diseaseInvasiveness,
                        std::vector<int> *diseasePopulation,
@@ -2272,7 +2272,7 @@ int parse_disease_data(char* epiFilename,
             int disease_time = -1;
             std::string disease_serotype;
             int disease_vt = -1;
-            int disease_sc = -1;
+            std::string disease_sc = "noSc";
             double disease_invasiveness = 0.0;
             int disease_population = -1;
             int disease_count = -1;
@@ -2289,7 +2289,7 @@ int parse_disease_data(char* epiFilename,
                     } else if (sIndex == 3) {
                         disease_vt = atoi(temp.c_str());
                     } else if (sIndex == 4) {
-                        disease_sc = atoi(temp.c_str());
+                        disease_sc = temp;
                     } else if (sIndex == 5) {
                         disease_invasiveness = atof(temp.c_str());
                     } else if (sIndex == 6) {
@@ -2325,7 +2325,7 @@ int compare_to_disease_data(std::vector<double> &diseaseDivergence,
                             std::vector<isolate*> *currentIsolates,
                             std::vector<int> *diseaseTime,
                             std::vector<std::string> *diseaseSeroList,
-                            std::vector<int> *diseaseScList,
+                            std::vector<std::string> *diseaseScList,
                             std::vector<int> *diseaseVt,
                             std::vector<double> *diseaseInvasiveness,
                             std::vector<int> *diseasePopulation,
@@ -2351,7 +2351,7 @@ int compare_to_disease_data(std::vector<double> &diseaseDivergence,
         if ((*diseaseTime)[i] == simulation_time) {
             // get serotype and strain
             std::string serotype = (*diseaseSeroList)[i];
-            int sc = (*diseaseScList)[i];
+            std::string sc = (*diseaseScList)[i];
             // calculate the carriage frequency of each
             std::vector<isolate*>::iterator iiter;
             for (iiter = currentIsolates->begin(), currentIsolates->end(); iiter != currentIsolates->end(); ++iiter) {
@@ -2378,7 +2378,7 @@ int compare_to_disease_data(std::vector<double> &diseaseDivergence,
         if ((*diseaseTime)[i] == simulation_time) {
             // isolate characteristics
             std::string serotype = (*diseaseSeroList)[i];
-            int sc = (*diseaseScList)[i];
+            std::string sc = (*diseaseScList)[i];
             double simulated_carriage_count = carriage_counts[i];
             double carriage_frequency = ((1.0)*simulated_carriage_count)/((1.0)*population_size);
             // calculate frequencies
@@ -2421,8 +2421,8 @@ int justRecordStats(int gen,int minGen,int sampleSize,std::vector<isolate*> *cur
     // data structures for sample
     std::vector<isolate*> isolateSample;
     std::vector<std::string> currentSerotypeObservations;
-    std::vector<int> currentVtScObservations;
-    std::vector<int> currentNvtScObservations;
+    std::vector<std::string> currentVtScObservations;
+    std::vector<std::string> currentNvtScObservations;
     
     // get appropriately sized random sample from simulation
     while (isolateSample.size() < unsigned (sampleSize)) {
@@ -2489,7 +2489,7 @@ double pearson(std::vector<double> *x,std::vector<double> *y) {
 // calculate reproductive fitness comparisons //
 ////////////////////////////////////////////////
 
-int rFitMetricCalculation(int minGen,std::vector<int> *samplingList,std::vector<int> &scList,std::vector< std::vector<double> > &sampledVtScFreq,std::vector< std::vector<double> > &sampledNvtScFreq,std::vector<isolate*> *population,std::vector<double> &rFitVector) {
+int rFitMetricCalculation(int minGen,std::vector<int> *samplingList,std::vector<std::string> &scList,std::vector< std::vector<double> > &sampledVtScFreq,std::vector< std::vector<double> > &sampledNvtScFreq,std::vector<isolate*> *population,std::vector<double> &rFitVector) {
     
     // data structures
     std::vector<double> actualFoldChanges(samplingList->size(),0.0);
@@ -2502,8 +2502,8 @@ int rFitMetricCalculation(int minGen,std::vector<int> *samplingList,std::vector<
 //    realNvtScFreq[genIndex][scIndex]+=(1/double(samplingList[genIndex]));
     
     // record VT and NVT observations
-    std::vector< std::vector<int> > genomicVtObservations(samplingList->size()+1);
-    std::vector< std::vector<int> > genomicNvtObservations(samplingList->size()+1);
+    std::vector< std::vector<std::string> > genomicVtObservations(samplingList->size()+1);
+    std::vector< std::vector<std::string> > genomicNvtObservations(samplingList->size()+1);
     
     std::vector<isolate*>::iterator iiter;
     for (iiter = population->begin(), population->end(); iiter != population->end(); ++iiter) {
@@ -2665,7 +2665,7 @@ int rFitMetricCalculation(int minGen,std::vector<int> *samplingList,std::vector<
 // write output to files //
 ///////////////////////////
 
-int printOutput(char* outputFilename,std::vector<std::string> *seroList,std::vector<std::vector<int> > &sampledSeroFreq,std::vector<int> *scList,std::vector<std::vector<int> > &vtScFreq,std::vector<std::vector<int> > &nvtScFreq,int gen,int minGen,std::vector<cog*> *accessoryLoci,std::vector<int> *samplingList,std::vector<std::vector<double> > &piGen,struct parms *sp,std::vector<double> * timeGen,std::vector<double> * fitGen,std::vector<std::string> * isolateGen,std::vector<int> * countGen,std::vector<double> * vacc_fitGen,std::vector<double> * nfds_fitGen,std::vector<double> * dens_fitGen,std::vector<double> * standardised_fitGen, std::vector<double> *nfds_deviation) {
+int printOutput(char* outputFilename,std::vector<std::string> *seroList,std::vector<std::vector<int> > &sampledSeroFreq,std::vector<std::string> *scList,std::vector<std::vector<int> > &vtScFreq,std::vector<std::vector<int> > &nvtScFreq,int gen,int minGen,std::vector<cog*> *accessoryLoci,std::vector<int> *samplingList,std::vector<std::vector<double> > &piGen,struct parms *sp,std::vector<double> * timeGen,std::vector<double> * fitGen,std::vector<std::string> * isolateGen,std::vector<int> * countGen,std::vector<double> * vacc_fitGen,std::vector<double> * nfds_fitGen,std::vector<double> * dens_fitGen,std::vector<double> * standardised_fitGen, std::vector<double> *nfds_deviation) {
     
     // debug
 //    for (unsigned int y = 0; y < samplingList->size(); y++) {
@@ -2716,9 +2716,9 @@ int printOutput(char* outputFilename,std::vector<std::string> *seroList,std::vec
     if (scOutFile.is_open()) {
         // write header
         scOutFile << "SC";
-        std::vector<int>::iterator siter;
+        std::vector<std::string>::iterator siter;
         for (siter = scList->begin(), scList->end(); siter != scList->end(); ++siter) {
-            scOutFile <<  "\tSC" << (*siter) << "_VT\tSC" << (*siter) << "_NVT";
+            scOutFile <<  "\t" << (*siter) << "_VT\t" << (*siter) << "_NVT";
         }
         scOutFile << std::endl;
         // write values
