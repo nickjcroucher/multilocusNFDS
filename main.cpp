@@ -73,13 +73,15 @@ int main(int argc, char * argv[]) {
     float seedStartingPopulation = 0.0;
     char* epiFilename = NULL;
     float partialVaccine = 0.0;
+    std::vector<std::string> sir_types;
+    float turnover_rate = 0.0;
     
     if (argc == 1) {
         usage(argv[0]);
         return 1;
     } else {
         int opt = 0;
-        while ((opt = getopt(argc,argv,"Ehc:p:s:v:i:t:n:g:u:l:y:j:k:f:x:w:r:o:m:z:e:a:b:d:q:F:1:2:0:H:D:M:S:I:V:N:P:")) != EOF) {
+        while ((opt = getopt(argc,argv,"Ehc:p:s:v:i:t:n:g:u:l:y:j:k:f:x:w:r:o:m:z:e:a:b:d:q:F:1:2:0:H:D:M:S:I:V:N:P:T:R:")) != EOF) {
             switch (opt) {
                 case 'h':
                     usage(argv[0]);
@@ -204,6 +206,16 @@ int main(int argc, char * argv[]) {
                 case 'P':
                     partialVaccine = atof(optarg);
                     break;
+                case 'R':
+                    char* tokchar;
+                    tokchar = strtok(optarg, ",");
+                    while(tokchar){
+                        sir_types.push_back(tokchar);
+                        tokchar = strtok(NULL, ",");
+                    }
+                    break;
+                case 'T':
+                turnover_rate = atof(optarg);
             }
         }
     }
@@ -416,6 +428,19 @@ int main(int argc, char * argv[]) {
     std::vector<std::vector<int> > vtScFreq(p.numGen+1,std::vector<int>(scList.size()));
     std::vector<std::vector<int> > nvtScFreq(p.numGen+1,std::vector<int>(scList.size()));
 
+    // 1D vectors for recording serotype immunity
+    std::vector<int> epiSerotypes(serotypeList.size());
+    for (int s = 0; s < serotypeList.size(); ++s) {
+        epiSerotypes[s] = 0;
+        for (int t = 0; t < sir_types.size(); ++t) {
+          if (serotypeList[s] == sir_types[t]) {
+              epiSerotypes[s] = 1;
+              break;
+          }
+        }
+    }
+    std::vector<double> serotypeFitnesses(serotypeList.size(),1.0);
+  
     // 2D vectors for recording cog deviations
     std::vector<std::vector<double> > piGen;
     std::vector<double> timeGen;
@@ -466,6 +491,15 @@ int main(int argc, char * argv[]) {
         return 1;
     }
     
+    // get serotype fitnesses if immunology is considered
+    if (sir_types.size() > 0) {
+        int sero_fitness_check = get_serotype_fitnesses(currentIsolates, &epiSerotypes, &serotypeList, serotypeFitnesses, turnover_rate);
+        if (sero_fitness_check != 0) {
+            std::cerr << "Unable to calculate serotype fitnesses" << std::endl;
+            return 1;
+        }
+    }
+  
     // fill in cog deviations stored values
     for (int i = 0; i < eqFreq.size(); i++) {
         cogDeviations_store[i][0] = cogDeviations[i];
@@ -622,7 +656,7 @@ int main(int argc, char * argv[]) {
             
             // allow cells to reproduce and update COG deviations array
             int reproCheck = reproduction(currentIsolates,futureIsolates,migrantPool,&cogWeights,&cogDeviations,&p,&eqFreq,&vtScFreq[gen-minGen],&nvtScFreq[gen-minGen],&piGen[gen-minGen],&scList,gen,&timeGen,&fitGen,&isolateGen,&countGen,popLimitFactor,minGen,secondVaccinationGeneration,partialVaccine,
-              &vacc_fitGen,&nfds_fitGen,&dens_fitGen,&standardised_fitGen,&nfds_deviation);
+              &vacc_fitGen,&nfds_fitGen,&dens_fitGen,&standardised_fitGen,&nfds_deviation,&serotypeList,&serotypeFitnesses);
             if (reproCheck == 8888) {
                 std::cerr << "Population exceeded limit at generation " << gen << std::endl;
                 // continue iterations to ensure fitting statistics still incremented
@@ -640,7 +674,16 @@ int main(int argc, char * argv[]) {
                 usage(argv[0]);
                 return 1;
             }
-        
+
+            // update serotype fitnesses if immunology is considered
+            if (sir_types.size() > 0) {
+                int sero_fitness_check = get_serotype_fitnesses(currentIsolates, &epiSerotypes, &serotypeList, serotypeFitnesses, turnover_rate);
+                if (sero_fitness_check != 0) {
+                    std::cerr << "Unable to calculate serotype fitnesses" << std::endl;
+                    return 1;
+                }
+            }
+          
         }
     
         // compare to genomes in the post-vaccine period
@@ -685,8 +728,8 @@ int main(int argc, char * argv[]) {
 //                        strainFittingStatsList.push_back(log(2));
 //                    }
                     numberComparisons++;
-                }
-                if (p.programme == "f" || p.programme == "b" || p.programme == "x") {
+                } else {
+//                if (p.programme == "f" || p.programme == "b" || p.programme == "x") {
                     int justRecordStatsCheck = justRecordStats(gen,minGen,(*samplingList)[gen-minGen],currentIsolates,accessoryLoci);
                     if (justRecordStatsCheck != 0) {
                         std::cerr << "Unable to record simulation statistics" << std::endl;

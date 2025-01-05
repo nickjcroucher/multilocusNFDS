@@ -1372,8 +1372,42 @@ std::vector<int> getValidStrains(std::vector<std::vector<isolate*> > migrantInpu
     
 }
 
+int get_serotype_fitnesses(std::vector<isolate*> *currentIsolates, std::vector<int> *epiSerotypes, std::vector<std::string> *serotypeList, std::vector<double> &serotypeFitnesses, float turnover_rate) {
+  
+    double population_size = 0.0;
+    std::vector<double> serotypeCounts(serotypeList->size());
+    
+    // iterate through population and calculate frequencies
+    std::vector<isolate*>::iterator iter;
+    for (iter = currentIsolates->begin(), currentIsolates->end(); iter != currentIsolates->end(); ++iter) {
+        for (int i = 0; i < serotypeList->size(); ++i) {
+            if ((*serotypeList)[i] == (*iter)->serotype) {
+              serotypeCounts[i]++;
+            }
+        }
+        population_size++;
+    }
+    
+    // Update fitnesses based on frequencies
+    for (int i = 0; i < serotypeList->size(); ++i) {
+        if ((*epiSerotypes)[i] == 1) {
+            std::cerr << "Serotype " << (*serotypeList)[i] << " Fitness: " << serotypeFitnesses[i] << " Turnover effect: " << (1.0 - serotypeFitnesses[i])*turnover_rate << " Frequency effect: " << serotypeCounts[i]/population_size << std::endl;
+            serotypeFitnesses[i] = serotypeFitnesses[i]+(1.0 - serotypeFitnesses[i])*turnover_rate - serotypeCounts[i]/population_size;
+            if (serotypeFitnesses[i] < 0.0) {
+                serotypeFitnesses[i] = 0.0;
+            }
+            if (serotypeFitnesses[i] > 1.0) {
+                serotypeFitnesses[i] = 1.0;
+            }
+        }
+    }
+  
+    return 0;
+  
+}
+
 int reproduction(std::vector<isolate*> *currentIsolates,std::vector<isolate*> *futureIsolates,std::vector<std::vector<std::vector<isolate*> > > *migrantPool, std::vector<double> *cogWeights, std::vector<double> *cogDeviations,struct parms *sp, std::vector<double> * ef, std::vector<int> * vtScFreq,std::vector<int> * nvtScFreq,std::vector<double> * piGen,std::vector<std::string> *scList, int gen,std::vector<double> * timeGen,std::vector<double> * fitGen,std::vector<std::string> * isolateGen,std::vector<int> * countGen, double popLimitFactor, int minGen, int secondVaccinationGeneration, float partialVaccine,
-  std::vector<double> *vacc_fitGen, std::vector<double> *nfds_fitGen, std::vector<double> *dens_fitGen, std::vector<double> *standardised_fitGen, std::vector<double> *nfds_deviation) {
+  std::vector<double> *vacc_fitGen, std::vector<double> *nfds_fitGen, std::vector<double> *dens_fitGen, std::vector<double> *standardised_fitGen, std::vector<double> *nfds_deviation, std::vector<std::string> *serotypeList, std::vector<double> *serotypeFitnesses) {
     
     // calculate population limit for memory management
     int popLimit = round(popLimitFactor * double(sp->popSize));
@@ -1430,14 +1464,22 @@ int reproduction(std::vector<isolate*> *currentIsolates,std::vector<isolate*> *f
         // calculate fitness of each new genotype in population
         if ((*iter)->id != oldId) {
             
+            // NFDS fitnesses
             std::vector<double> fitnesses(cogDeviations->size());
-            
             std::transform(cogDeviations->begin(), cogDeviations->end(), (*iter)->genotype.begin(), fitnesses.begin(), std::multiplies<double>());
-          
             double freqDepFitSum = std::accumulate(fitnesses.begin(),fitnesses.end(),0.0);
             double freqDepFit = pow((1+sp->fSelection),freqDepFitSum);
             double vaccineFit = 1.0;
           
+            // Serotype fitnesses
+            double serotype_fitness = 1.0;
+            for (int i = 0; i < serotypeList->size(); ++i) {
+                if ((*serotypeList)[i]==(*iter)->serotype) {
+                    serotype_fitness = (*serotypeFitnesses)[i];
+                    break;
+                }
+            }
+            
             // only switch on vaccine selection pressure after vaccine is introduced
             if (gen >= 0 && (*iter)->vt) {
                 // if vaccine lag, then only apply to latent_vt for the second vaccine
@@ -1493,7 +1535,7 @@ int reproduction(std::vector<isolate*> *currentIsolates,std::vector<isolate*> *f
             }
           
             // calculate overall fitness
-            double overallFitness = baseR*vaccineFit*freqDepFit;
+            double overallFitness = baseR*vaccineFit*freqDepFit*serotype_fitness;
             oldFitness = overallFitness;
             oldId = (*iter)->id;
             

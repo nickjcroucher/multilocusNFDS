@@ -100,7 +100,10 @@ int parse_disease_data(char* epiFilename,
 //////////////////////////////
 
 // select next generation
-int reproduction(std::vector<isolate*> *currentIsolates,std::vector<isolate*> *futureIsolates,std::vector<std::vector<std::vector<isolate*> > > *migrantPool,std::vector<double> *cogWeights,std::vector<double> *cogDeviations,struct parms *sp, std::vector<double> * ef, std::vector<int> * vtScFreq,std::vector<int> * nvtScFreq,std::vector<double> * piGen,std::vector<std::string> *scList, int gen,std::vector<double> * timeGen,std::vector<double> * fitGen,std::vector<std::string> * isolateGen,std::vector<int> * countGen, double popLimitFactor, int minGen, int secondVaccinationGeneration, float partialVaccine, std::vector<double> *vacc_fitGen, std::vector<double> *nfds_fitGen, std::vector<double> *dens_fitGen, std::vector<double> *standardised_fitGen, std::vector<double> *nfds_deviation);
+int reproduction(std::vector<isolate*> *currentIsolates,std::vector<isolate*> *futureIsolates,std::vector<std::vector<std::vector<isolate*> > > *migrantPool,std::vector<double> *cogWeights,std::vector<double> *cogDeviations,struct parms *sp, std::vector<double> * ef, std::vector<int> * vtScFreq,std::vector<int> * nvtScFreq,std::vector<double> * piGen,std::vector<std::string> *scList, int gen,std::vector<double> * timeGen,std::vector<double> * fitGen,std::vector<std::string> * isolateGen,std::vector<int> * countGen, double popLimitFactor, int minGen, int secondVaccinationGeneration, float partialVaccine, std::vector<double> *vacc_fitGen, std::vector<double> *nfds_fitGen, std::vector<double> *dens_fitGen, std::vector<double> *standardised_fitGen, std::vector<double> *nfds_deviation, std::vector<std::string> *serotypeList, std::vector<double> *serotypeFitnesses);
+
+// serotype fitnesses
+int get_serotype_fitnesses(std::vector<isolate*> *currentIsolates, std::vector<int> *epiSerotypes, std::vector<std::string> *serotypeList, std::vector<double> &serotypeFitnesses, float turnover_rate);
 
 // recombination
 int recombination(std::vector<isolate*> *currentIsolates,std::vector<isolate*> *futureIsolates,char* markerFilename,double transformationProportion,double transformationRate,double transformationAsymmetryLoci, double transformationAsymmetryMarker);
