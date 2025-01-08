@@ -455,7 +455,7 @@ int main(int argc, char * argv[]) {
     std::vector<std::string> isolateGen;
     std::vector<int> countGen;
     if (p.programme == "x") {
-        piGen.resize(p.numGen-minGen,std::vector<double>(accessoryLoci->size(),0.0));
+        piGen.resize(p.numGen-minGen+1,std::vector<double>(accessoryLoci->size(),0.0));
     } else {
         piGen.resize(samplingList->size()+1,std::vector<double>(accessoryLoci->size(),0.0));
     }
