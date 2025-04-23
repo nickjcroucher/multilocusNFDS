@@ -71,6 +71,8 @@ int dividePopulationForImmigration(std::vector<isolate*> *pop,std::vector<std::s
 int dividePopulationForImmigrationByTime(std::vector<isolate*> *pop, int minGen, int numgen,std::vector<std::vector<isolate*> > *popByTime);
 
 // get isolates for starting population
+int new_getStartingIsolates(std::vector<isolate*> *pop,struct parms *sp,std::vector<isolate*> *first,std::vector<cog*> *accessoryLoci, int,std::vector<double> &eqFreq,std::vector<double> &cogWeights,std::vector<double> &cogDeviations,std::vector<int> &startingVtScFrequencies,std::vector<int> &startingNvtScFrequencies,std::vector<std::string> *scList, int minGen, float seedStartingPopulation, std::vector<std::vector<std::vector<isolate*> > > *migrantPool, int maxScNum);
+
 int getStartingIsolates(std::vector<isolate*> *pop,struct parms *sp,std::vector<isolate*> *first,std::vector<cog*> *accessoryLoci, int,std::vector<double> &eqFreq,std::vector<double> &cogWeights,std::vector<double> &cogDeviations,std::vector<int> &startingVtScFrequencies,std::vector<int> &startingNvtScFrequencies,std::vector<std::string> *scList, int minGen, float seedStartingPopulation, char* migrantFilename, std::vector<isolate*> *migrant_population, int maxScNum);
 
 // sample selected from first generation

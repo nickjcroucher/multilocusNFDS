@@ -285,7 +285,7 @@ int main(int argc, char * argv[]) {
     }
     
     // get final max SC num
-  int maxScNum = scList.size();
+    int maxScNum = scList.size();
     
     // parse migrant marker file
     if (markerFilename != NULL) {
@@ -469,22 +469,21 @@ int main(int argc, char * argv[]) {
     
     // initialise population in first generation, record simulated population statistics
     int gen = minGen;
-    int initialiseCheck = getStartingIsolates(population,
-                                              &p,
-                                              currentIsolates,
-                                              accessoryLoci,
-                                              p.popSize,
-                                              eqFreq,
-                                              cogWeights,
-                                              cogDeviations,
-                                              vtScFreq[0],
-                                              nvtScFreq[0],
-                                              &scList,
-                                              minGen,
-                                              seedStartingPopulation,
-                                              migrantFilename,
-                                              migrant_population,
-                                              maxScNum);
+    int initialiseCheck = new_getStartingIsolates(population,
+                                                  &p,
+                                                  currentIsolates,
+                                                  accessoryLoci,
+                                                  p.popSize,
+                                                  eqFreq,
+                                                  cogWeights,
+                                                  cogDeviations,
+                                                  vtScFreq[0],
+                                                  nvtScFreq[0],
+                                                  &scList,
+                                                  minGen,
+                                                  seedStartingPopulation,
+                                                  migrantPool,
+                                                  maxScNum);
     if (initialiseCheck != 0) {
         std::cerr << "Unable to initialise population" << std::endl;
         usage(argv[0]);
@@ -559,6 +558,26 @@ int main(int argc, char * argv[]) {
         
     }
     
+    // get initial disease sample
+    if (epiFilename != NULL) {
+        int disease_comparison = compare_to_disease_data(diseaseFittingStatsList,
+                                    gen,
+                                    currentIsolates,
+                                    diseaseTime,
+                                    diseaseSeroList,
+                                    diseaseScList,
+                                    diseaseVt,
+                                    diseaseInvasiveness,
+                                    diseasePopulation,
+                                    diseaseCount,
+                                    diseaseOutFile);
+        if (disease_comparison != 0) {
+            std::cerr << "Unable to compare simulated and actual disease frequencies" << std::endl;
+            usage(argv[0]);
+            return 1;
+        }
+    }
+
     /////////////////////////////////
     // Iterate through generations //
     /////////////////////////////////
